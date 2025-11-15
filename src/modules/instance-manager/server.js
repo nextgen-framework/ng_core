@@ -1,0 +1,469 @@
+/**
+ * NextGen Framework - Instance Manager Module
+ * Manages routing buckets for player isolation (instances, apartments, missions, etc.)
+ */
+
+class InstanceManager {
+  constructor(framework) {
+    this.framework = framework;
+    this.db = framework.database;
+    this.logger = null;
+
+    // Instance tracking
+    this.instances = new Map(); // instanceId => Instance object
+    this.playerInstances = new Map(); // source => instanceId
+    this.routingBuckets = new Map(); // routingBucket => instanceId
+
+    // Configuration
+    this.config = {
+      maxInstances: 1000,
+      defaultBucket: 0, // Public world
+      autoCleanupEmpty: true,
+      autoCleanupDelay: 60000, // 1 minute
+      instanceTypes: ['apartment', 'mission', 'heist', 'race', 'custom'],
+      maxPlayersPerInstance: 32
+    };
+
+    // Bucket allocation
+    this.nextBucket = 1; // Start from 1 (0 is public)
+    this.freeBuckets = []; // Recycled buckets
+  }
+
+  /**
+   * Initialize instance manager module
+   */
+  async init() {
+    this.logger = this.framework.getModule('logger');
+
+    // Handle player drops
+    on('playerDropped', () => {
+      const source = global.source;
+      this.handlePlayerLeft(source);
+    });
+
+    this.log('Instance manager module initialized', 'info');
+  }
+
+  /**
+   * Create a new instance
+   */
+  async createInstance(type, owner = null, metadata = {}) {
+    if (this.instances.size >= this.config.maxInstances) {
+      return { success: false, reason: 'max_instances_reached' };
+    }
+
+    const instanceId = this.generateInstanceId();
+    const routingBucket = this.allocateBucket();
+
+    const instance = {
+      id: instanceId,
+      type,
+      owner,
+      routingBucket,
+      players: new Set(),
+      createdAt: Date.now(),
+      metadata,
+      locked: false,
+      maxPlayers: metadata.maxPlayers || this.config.maxPlayersPerInstance
+    };
+
+    this.instances.set(instanceId, instance);
+    this.routingBuckets.set(routingBucket, instanceId);
+
+    // Set routing bucket properties
+    SetRoutingBucketPopulationEnabled(routingBucket, false); // Disable auto-population
+    SetRoutingBucketEntityLockdownMode(routingBucket, 'relaxed'); // Allow entity creation
+
+    this.log(`Created instance: ${instanceId} (type: ${type}, bucket: ${routingBucket})`, 'info', {
+      instanceId,
+      type,
+      owner,
+      routingBucket
+    });
+
+    return { success: true, instanceId, routingBucket };
+  }
+
+  /**
+   * Delete an instance
+   */
+  async deleteInstance(instanceId, force = false) {
+    const instance = this.instances.get(instanceId);
+
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    // Check if instance has players
+    if (instance.players.size > 0 && !force) {
+      return { success: false, reason: 'instance_not_empty' };
+    }
+
+    // Remove all players if force
+    if (force) {
+      for (const source of instance.players) {
+        await this.removePlayerFromInstance(source);
+      }
+    }
+
+    // Free the routing bucket
+    this.freeBucket(instance.routingBucket);
+
+    // Clean up
+    this.instances.delete(instanceId);
+    this.routingBuckets.delete(instance.routingBucket);
+
+    this.log(`Deleted instance: ${instanceId}`, 'info', { instanceId, force });
+
+    return { success: true };
+  }
+
+  /**
+   * Add player to instance
+   */
+  async addPlayerToInstance(source, instanceId) {
+    const instance = this.instances.get(instanceId);
+
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    // Check if instance is locked
+    if (instance.locked) {
+      return { success: false, reason: 'instance_locked' };
+    }
+
+    // Check max players
+    if (instance.players.size >= instance.maxPlayers) {
+      return { success: false, reason: 'instance_full' };
+    }
+
+    // Remove from current instance first
+    const currentInstance = this.playerInstances.get(source);
+    if (currentInstance) {
+      await this.removePlayerFromInstance(source);
+    }
+
+    // Add to new instance
+    instance.players.add(source);
+    this.playerInstances.set(source, instanceId);
+
+    // Set player's routing bucket
+    SetPlayerRoutingBucket(source, instance.routingBucket);
+
+    this.log(`Player ${source} joined instance ${instanceId}`, 'debug', {
+      source,
+      instanceId,
+      routingBucket: instance.routingBucket
+    });
+
+    // Emit event
+    emitNet('ng-core:instance-joined', source, instanceId, instance.type);
+
+    // Trigger cleanup check
+    if (this.config.autoCleanupEmpty) {
+      this.scheduleCleanupCheck(instanceId);
+    }
+
+    return { success: true, routingBucket: instance.routingBucket };
+  }
+
+  /**
+   * Remove player from instance
+   */
+  async removePlayerFromInstance(source) {
+    const instanceId = this.playerInstances.get(source);
+
+    if (!instanceId) {
+      return { success: false, reason: 'player_not_in_instance' };
+    }
+
+    const instance = this.instances.get(instanceId);
+
+    if (!instance) {
+      // Instance was deleted, just clean up player tracking
+      this.playerInstances.delete(source);
+      SetPlayerRoutingBucket(source, this.config.defaultBucket);
+      return { success: true };
+    }
+
+    // Remove from instance
+    instance.players.delete(source);
+    this.playerInstances.delete(source);
+
+    // Return to public world
+    SetPlayerRoutingBucket(source, this.config.defaultBucket);
+
+    this.log(`Player ${source} left instance ${instanceId}`, 'debug', {
+      source,
+      instanceId
+    });
+
+    // Emit event
+    emitNet('ng-core:instance-left', source, instanceId);
+
+    // Auto cleanup if empty
+    if (this.config.autoCleanupEmpty && instance.players.size === 0) {
+      this.scheduleCleanupCheck(instanceId);
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Transfer player between instances
+   */
+  async transferPlayer(source, targetInstanceId) {
+    return await this.addPlayerToInstance(source, targetInstanceId);
+  }
+
+  /**
+   * Get player's current instance
+   */
+  getPlayerInstance(source) {
+    const instanceId = this.playerInstances.get(source);
+    if (!instanceId) return null;
+
+    return this.instances.get(instanceId);
+  }
+
+  /**
+   * Get instance by ID
+   */
+  getInstance(instanceId) {
+    return this.instances.get(instanceId) || null;
+  }
+
+  /**
+   * Get all instances
+   */
+  getAllInstances() {
+    return Array.from(this.instances.values());
+  }
+
+  /**
+   * Get instances by type
+   */
+  getInstancesByType(type) {
+    return this.getAllInstances().filter(i => i.type === type);
+  }
+
+  /**
+   * Get instances by owner
+   */
+  getInstancesByOwner(owner) {
+    return this.getAllInstances().filter(i => i.owner === owner);
+  }
+
+  /**
+   * Lock instance (prevent new players)
+   */
+  lockInstance(instanceId) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    instance.locked = true;
+    this.log(`Instance ${instanceId} locked`, 'debug');
+
+    return { success: true };
+  }
+
+  /**
+   * Unlock instance
+   */
+  unlockInstance(instanceId) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    instance.locked = false;
+    this.log(`Instance ${instanceId} unlocked`, 'debug');
+
+    return { success: true };
+  }
+
+  /**
+   * Set instance metadata
+   */
+  setInstanceMetadata(instanceId, metadata) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    instance.metadata = { ...instance.metadata, ...metadata };
+
+    return { success: true };
+  }
+
+  /**
+   * Get instance metadata
+   */
+  getInstanceMetadata(instanceId) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return null;
+
+    return instance.metadata;
+  }
+
+  /**
+   * Invite player to instance
+   */
+  async invitePlayer(source, instanceId) {
+    const instance = this.instances.get(instanceId);
+
+    if (!instance) {
+      return { success: false, reason: 'instance_not_found' };
+    }
+
+    // Send invitation to client
+    emitNet('ng-core:instance-invite', source, instanceId, instance.type, instance.metadata);
+
+    this.log(`Player ${source} invited to instance ${instanceId}`, 'debug');
+
+    return { success: true };
+  }
+
+  /**
+   * Check if player is in same instance as another player
+   */
+  arePlayersInSameInstance(source1, source2) {
+    const instance1 = this.playerInstances.get(source1);
+    const instance2 = this.playerInstances.get(source2);
+
+    return instance1 && instance2 && instance1 === instance2;
+  }
+
+  /**
+   * Get players in same instance
+   */
+  getPlayersInInstance(instanceId) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return [];
+
+    return Array.from(instance.players);
+  }
+
+  /**
+   * Broadcast event to instance
+   */
+  broadcastToInstance(instanceId, eventName, ...args) {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return;
+
+    for (const source of instance.players) {
+      emitNet(eventName, source, ...args);
+    }
+  }
+
+  /**
+   * Schedule cleanup check for empty instance
+   */
+  scheduleCleanupCheck(instanceId) {
+    setTimeout(() => {
+      const instance = this.instances.get(instanceId);
+
+      if (instance && instance.players.size === 0) {
+        this.log(`Auto-cleaning empty instance: ${instanceId}`, 'debug');
+        this.deleteInstance(instanceId);
+      }
+    }, this.config.autoCleanupDelay);
+  }
+
+  /**
+   * Handle player leaving server
+   */
+  handlePlayerLeft(source) {
+    const instanceId = this.playerInstances.get(source);
+
+    if (instanceId) {
+      this.removePlayerFromInstance(source);
+    }
+  }
+
+  /**
+   * Generate unique instance ID
+   */
+  generateInstanceId() {
+    return `instance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Allocate routing bucket
+   */
+  allocateBucket() {
+    // Reuse freed bucket if available
+    if (this.freeBuckets.length > 0) {
+      return this.freeBuckets.pop();
+    }
+
+    // Allocate new bucket
+    return this.nextBucket++;
+  }
+
+  /**
+   * Free routing bucket for reuse
+   */
+  freeBucket(bucket) {
+    if (bucket > 0) { // Don't free bucket 0 (public)
+      this.freeBuckets.push(bucket);
+    }
+  }
+
+  /**
+   * Get instance statistics
+   */
+  getStats() {
+    return {
+      totalInstances: this.instances.size,
+      totalPlayers: this.playerInstances.size,
+      bucketCount: this.nextBucket - 1,
+      freeBuckets: this.freeBuckets.length,
+      instancesByType: this.config.instanceTypes.reduce((acc, type) => {
+        acc[type] = this.getInstancesByType(type).length;
+        return acc;
+      }, {})
+    };
+  }
+
+  /**
+   * Configure instance manager
+   */
+  configure(config) {
+    this.config = { ...this.config, ...config };
+    this.log('Instance manager configuration updated', 'info');
+  }
+
+  /**
+   * Log helper
+   */
+  log(message, level = 'info', metadata = {}) {
+    if (this.logger) {
+      this.logger.log(message, level, metadata);
+    } else {
+      this.framework.utils.Log(`[Instance Manager] ${message}`, level);
+    }
+  }
+
+  /**
+   * Cleanup
+   */
+  async destroy() {
+    // Return all players to public world
+    for (const source of this.playerInstances.keys()) {
+      SetPlayerRoutingBucket(source, this.config.defaultBucket);
+    }
+
+    this.instances.clear();
+    this.playerInstances.clear();
+    this.routingBuckets.clear();
+    this.freeBuckets = [];
+
+    this.log('Instance manager module destroyed', 'info');
+  }
+}
+
+module.exports = InstanceManager;

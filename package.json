@@ -1,0 +1,36 @@
+{
+  "name": "@nextgen/core",
+  "version": "1.0.0",
+  "description": "Ultra-Generic & Dynamic FiveM Core - Build Anything",
+  "main": "src/core/server/main.js",
+  "scripts": {
+    "dev": "echo 'NextGen Core is running in dev mode'",
+    "build": "echo 'No build step required for pure JS'",
+    "lint": "eslint src/ plugins/"
+  },
+  "keywords": [
+    "fivem",
+    "core",
+    "framework",
+    "generic",
+    "dynamic",
+    "nextgen",
+    "ng-core",
+    "javascript",
+    "es2017"
+  ],
+  "author": "NextGen Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@citizenfx/client": "latest",
+    "@citizenfx/server": "latest",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=16.x"
+  },
+  "dependencies": {
+    "point-in-polygon": "^1.1.0",
+    "polygon-lookup": "^2.6.0"
+  }
+}
