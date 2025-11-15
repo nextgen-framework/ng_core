@@ -385,6 +385,18 @@ Phase 3: Plugins
 
 ## ⚙️ Configuration
 
+### Server Convars (server.cfg)
+
+```bash
+# Framework debug mode
+set ngcore_debug true
+
+# Whitelist (disabled by default for development)
+setr ngcore_whitelist_enabled "false"  # Set to "true" for production
+```
+
+### Module Configuration
+
 Edit `src/core/shared/config.js`:
 
 ```javascript
@@ -398,6 +410,7 @@ const Config = {
     { name: 'resource-monitor', priority: 0 },
     { name: 'plugin-manager', priority: 1 },
     { name: 'rpc', priority: 5 },
+    { name: 'whitelist', priority: 8 },      // Optional: disabled by default
     { name: 'player-manager', priority: 10 },
     { name: 'entity-manager', priority: 10 },
     { name: 'chat-commands', priority: 15 },
@@ -413,6 +426,23 @@ const Config = {
     { name: 'performance', priority: 20 }
   ]
 };
+```
+
+### Whitelist Configuration
+
+**Development (Default):**
+```bash
+# In server.cfg
+setr ngcore_whitelist_enabled "false"
+```
+
+**Production:**
+```bash
+# In server.cfg
+setr ngcore_whitelist_enabled "true"
+
+# Add yourself to whitelist (in-game)
+/wladd license:your_license_key
 ```
 
 ---

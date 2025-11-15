@@ -11,7 +11,9 @@ class Whitelist {
 
     // In-memory cache for fast lookups
     this.whitelistedPlayers = new Set();
-    this.enabled = true;
+
+    // Check convar for whitelist enable/disable (default: false for development)
+    this.enabled = GetConvar('ngcore_whitelist_enabled', 'false') === 'true';
   }
 
   /**
@@ -30,7 +32,12 @@ class Whitelist {
     );
 
     const count = this.whitelistedPlayers.size;
-    this.log(`Whitelist module initialized (${count} whitelisted players)`, 'info');
+    const status = this.enabled ? 'ENABLED' : 'DISABLED';
+    this.log(`Whitelist module initialized - ${status} (${count} whitelisted players)`, 'info');
+
+    if (!this.enabled) {
+      this.log('Whitelist is DISABLED - all players can connect. Set setr ngcore_whitelist_enabled "true" to enable.', 'warn');
+    }
   }
 
   /**
