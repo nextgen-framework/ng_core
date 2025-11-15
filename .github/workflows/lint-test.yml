@@ -18,13 +18,12 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18'
-        cache: 'yarn'
 
     - name: Install dependencies
-      run: yarn install --frozen-lockfile
+      run: npm ci || npm install
 
     - name: Run ESLint
-      run: yarn lint
+      run: npm run lint
       continue-on-error: true
 
     - name: Check code formatting
@@ -76,10 +75,10 @@ jobs:
         node-version: '18'
 
     - name: Install dependencies
-      run: yarn install --frozen-lockfile
+      run: npm ci || npm install
 
     - name: Run npm audit
-      run: yarn audit --level moderate
+      run: npm audit --audit-level=moderate
       continue-on-error: true
 
     - name: Check for secrets
