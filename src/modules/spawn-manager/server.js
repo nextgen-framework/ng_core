@@ -311,7 +311,7 @@ class SpawnManager {
    */
   async getLastPosition(source) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return null;
 
       const identifier = player.getIdentifier('license');
@@ -352,7 +352,7 @@ class SpawnManager {
    */
   async saveLastPosition(source) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return;
 
       const identifier = player.getIdentifier('license');

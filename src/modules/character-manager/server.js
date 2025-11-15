@@ -59,7 +59,7 @@ class CharacterManager {
    */
   async getPlayerCharacters(source) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return [];
 
       const identifier = player.getIdentifier('license');
@@ -94,7 +94,7 @@ class CharacterManager {
    */
   async createCharacter(source, characterData) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) {
         return { success: false, reason: 'player_not_found' };
       }
@@ -173,7 +173,7 @@ class CharacterManager {
    */
   async selectCharacter(source, characterId) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) {
         return { success: false, reason: 'player_not_found' };
       }
@@ -234,7 +234,7 @@ class CharacterManager {
    */
   async deleteCharacter(source, characterId) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) {
         return { success: false, reason: 'player_not_found' };
       }

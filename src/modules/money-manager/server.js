@@ -58,7 +58,7 @@ class MoneyManager {
    */
   async loadPlayerMoney(source) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return false;
 
       const identifier = player.getIdentifier('license');
@@ -102,7 +102,7 @@ class MoneyManager {
    */
   async savePlayerMoney(source) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return false;
 
       const identifier = player.getIdentifier('license');
@@ -375,8 +375,8 @@ class MoneyManager {
    */
   async logTransaction(fromSource, toSource, type, amount, transactionType, reason) {
     try {
-      const fromPlayer = fromSource ? (this.playerManager ? this.playerManager.getPlayer(fromSource) : null) : null;
-      const toPlayer = toSource ? (this.playerManager ? this.playerManager.getPlayer(toSource) : null) : null;
+      const fromPlayer = fromSource ? (this.playerManager ? this.playerManager.get(fromSource) : null) : null;
+      const toPlayer = toSource ? (this.playerManager ? this.playerManager.get(toSource) : null) : null;
 
       const fromIdentifier = fromPlayer ? fromPlayer.getIdentifier('license') : null;
       const toIdentifier = toPlayer ? toPlayer.getIdentifier('license') : null;
@@ -396,7 +396,7 @@ class MoneyManager {
    */
   async getTransactions(source, limit = 50) {
     try {
-      const player = this.playerManager ? this.playerManager.getPlayer(source) : null;
+      const player = this.playerManager ? this.playerManager.get(source) : null;
       if (!player) return [];
 
       const identifier = player.getIdentifier('license');
