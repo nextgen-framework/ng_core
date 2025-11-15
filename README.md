@@ -80,15 +80,9 @@ Framework initialized successfully!
 
 ```
 /help [command]          - Show help (h, ?)
-/players                 - List players (online, list)
-/announce <msg>          - Broadcast (admin) (broadcast, ann)
-/goto <id>               - Teleport to player (admin) (tp)
-/bring <id>              - Bring player (admin)
-/heal [id]               - Heal yourself or player
-/weapon <name>           - Give weapon (admin) (gun)
-/clear                   - Clear chat (cls)
-/perf                    - Server performance stats
 ```
+
+All other commands are provided by plugins (ng-demo, ng-test, or your own plugins).
 
 ---
 
