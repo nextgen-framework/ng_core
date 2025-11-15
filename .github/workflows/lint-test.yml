@@ -36,9 +36,9 @@ jobs:
             module_name=$(basename "$module")
             echo "Checking module: $module_name"
 
-            # Check for at least one of server.js or client.js
-            if [ ! -f "$module/server.js" ] && [ ! -f "$module/client.js" ]; then
-              echo "Module $module_name missing server.js or client.js"
+            # Check for at least one of server.js, client.js, or shared.js
+            if [ ! -f "$module/server.js" ] && [ ! -f "$module/client.js" ] && [ ! -f "$module/shared.js" ]; then
+              echo "Module $module_name missing server.js, client.js, or shared.js"
               exit 1
             fi
           fi
