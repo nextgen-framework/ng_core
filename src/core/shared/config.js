@@ -20,7 +20,7 @@ const Config = {
     { name: 'plugin-manager', priority: 2 },    // Manage plugins
     { name: 'persistence', priority: 3 },       // Persistence manager (after database)
     { name: 'rpc', priority: 5 },
-    { name: 'whitelist', priority: 8 },         // Whitelist (before player-manager)
+    // { name: 'whitelist', priority: 8 },         // Whitelist (before player-manager) - DISABLED FOR DEVELOPMENT
     { name: 'queue', priority: 9 },             // Queue (after whitelist, before player-manager)
     { name: 'access-manager', priority: 11 },   // Access control (keys, doors, locks)
     { name: 'admin-manager', priority: 11 },    // Admin tools
