@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "echo 'NextGen Core is running in dev mode'",
     "build": "echo 'No build step required for pure JS'",
-    "lint": "eslint src/ plugins/"
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "test": "echo 'Run ng-test in FiveM server'",
+    "validate": "node scripts/validate-structure.js",
+    "format": "prettier --write 'src/**/*.js'",
+    "check-format": "prettier --check 'src/**/*.js'"
   },
   "keywords": [
     "fivem",
@@ -24,7 +29,8 @@
   "devDependencies": {
     "@citizenfx/client": "latest",
     "@citizenfx/server": "latest",
-    "eslint": "^8.0.0"
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
   },
   "engines": {
     "node": ">=16.x"
