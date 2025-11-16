@@ -77,7 +77,7 @@ class SyncManager {
 
     // Handle player connecting
     on('playerJoining', () => {
-      const source = global.source;
+      // Note: 'source' is a magic global variable in FiveM event handlers
       this.syncToPlayer(source);
     });
 
