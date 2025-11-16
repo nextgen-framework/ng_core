@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# NextGen Framework - Pre-commit Hook
+# Validates code before allowing commit
+#
+
+echo "🔍 Running pre-commit validation..."
+
+# Check for wrong framework methods in source files only
+echo "📋 Checking framework API usage..."
+
+# Search for executeHook (should be runHook)
+if git diff --cached --name-only | grep -E 'src/.*\.js$' | xargs grep -l 'this\.framework\.executeHook' 2>/dev/null; then
+  echo "❌ ERROR: Found usage of 'this.framework.executeHook'"
+  echo "   Fix: Replace with 'this.framework.runHook'"
+  exit 1
+fi
+
+# Search for triggerHook (should be runHook)
+if git diff --cached --name-only | grep -E 'src/.*\.js$' | xargs grep -l 'this\.framework\.triggerHook' 2>/dev/null; then
+  echo "❌ ERROR: Found usage of 'this.framework.triggerHook'"
+  echo "   Fix: Replace with 'this.framework.runHook'"
+  exit 1
+fi
+
+# Check for require() in client.js files
+echo "🌐 Checking client-side code..."
+for file in $(git diff --cached --name-only | grep 'src/.*client\.js$'); do
+  if [ -f "$file" ] && grep -q 'const.*require(' "$file"; then
+    echo "❌ ERROR: Found require() in client-side file: $file"
+    echo "   Fix: require() is NOT available in FiveM client environment"
+    exit 1
+  fi
+done
+
+echo "✅ All pre-commit checks passed!"
+exit 0

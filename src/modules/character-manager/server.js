@@ -144,7 +144,7 @@ class CharacterManager {
       });
 
       // Trigger hook for other modules (e.g., money-manager to create account)
-      await this.framework.triggerHook('character:created', source, characterId, characterData);
+      await this.framework.runHook('character:created', source, characterId, characterData);
 
       return {
         success: true,
@@ -219,7 +219,7 @@ class CharacterManager {
       this.log(`Player ${source} selected character ${characterId}`, 'info');
 
       // Trigger hook for other modules to load character data
-      await this.framework.triggerHook('character:selected', source, character);
+      await this.framework.runHook('character:selected', source, character);
 
       return { success: true, character };
     } catch (error) {
@@ -254,7 +254,7 @@ class CharacterManager {
       }
 
       // Trigger hook before deletion (other modules can clean up their data)
-      await this.framework.triggerHook('character:beforeDelete', source, characterId);
+      await this.framework.runHook('character:beforeDelete', source, characterId);
 
       // Delete character
       await this.db.execute('DELETE FROM characters WHERE id = ?', [characterId]);
@@ -262,7 +262,7 @@ class CharacterManager {
       this.log(`Deleted character ${characterId}`, 'info', { source, identifier });
 
       // Trigger hook after deletion
-      await this.framework.triggerHook('character:deleted', source, characterId);
+      await this.framework.runHook('character:deleted', source, characterId);
 
       return { success: true };
     } catch (error) {

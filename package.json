@@ -9,7 +9,10 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "echo 'Run ng-test in FiveM server'",
-    "validate": "node scripts/validate-structure.js",
+    "validate": "npm run lint",
+    "validate:all": "npm run lint && node scripts/validate-structure.js",
+    "install:hooks": "bash scripts/install-hooks.sh",
+    "postinstall": "npm run install:hooks",
     "format": "prettier --write 'src/**/*.js'",
     "check-format": "prettier --check 'src/**/*.js'"
   },

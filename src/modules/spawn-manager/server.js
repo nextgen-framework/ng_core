@@ -231,7 +231,7 @@ class SpawnManager {
     if (spawn.category === 'default') return true;
 
     // Can be extended by plugins via framework hooks
-    const result = await this.framework.triggerHook(
+    const result = await this.framework.runHook(
       'spawn:checkPermission',
       source,
       spawn
