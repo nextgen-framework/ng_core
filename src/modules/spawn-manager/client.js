@@ -14,8 +14,8 @@ class SpawnManagerClient {
    */
   init() {
     // Listen for spawn events
-    onNet('ng-core:spawn-at', this.onSpawnAt.bind(this));
-    onNet('ng-core:spawn-select', this.onSpawnSelect.bind(this));
+    onNet('ng_core:spawn-at', this.onSpawnAt.bind(this));
+    onNet('ng_core:spawn-select', this.onSpawnSelect.bind(this));
 
     // Freeze player until spawn
     FreezeEntityPosition(PlayerPedId(), true);
@@ -80,7 +80,7 @@ class SpawnManagerClient {
         console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
 
         // Trigger event for other modules
-        emit('ng-core:player-spawned', coords);
+        emit('ng_core:player-spawned', coords);
       }
     }, 100);
   }
@@ -93,7 +93,7 @@ class SpawnManagerClient {
     // For now, just pick the first spawn
     if (availableSpawns.length > 0) {
       const spawn = availableSpawns[0];
-      emitNet('ng-core:spawn-selected', spawn.id);
+      emitNet('ng_core:spawn-selected', spawn.id);
     }
   }
 

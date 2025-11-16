@@ -15,9 +15,9 @@ class InstanceManagerClient {
    */
   init() {
     // Listen for instance events
-    onNet('ng-core:instance-joined', this.onInstanceJoined.bind(this));
-    onNet('ng-core:instance-left', this.onInstanceLeft.bind(this));
-    onNet('ng-core:instance-invite', this.onInstanceInvite.bind(this));
+    onNet('ng_core:instance-joined', this.onInstanceJoined.bind(this));
+    onNet('ng_core:instance-left', this.onInstanceLeft.bind(this));
+    onNet('ng_core:instance-invite', this.onInstanceInvite.bind(this));
 
     console.log('[Instance Manager] Client initialized');
   }
@@ -100,7 +100,7 @@ class InstanceManagerClient {
    * Accept instance invitation
    */
   acceptInvite(instanceId) {
-    emitNet('ng-core:instance-accept-invite', instanceId);
+    emitNet('ng_core:instance-accept-invite', instanceId);
 
     // Remove from pending
     this.pendingInvites = this.pendingInvites.filter(i => i.instanceId !== instanceId);
@@ -110,7 +110,7 @@ class InstanceManagerClient {
    * Decline instance invitation
    */
   declineInvite(instanceId) {
-    emitNet('ng-core:instance-decline-invite', instanceId);
+    emitNet('ng_core:instance-decline-invite', instanceId);
 
     // Remove from pending
     this.pendingInvites = this.pendingInvites.filter(i => i.instanceId !== instanceId);
@@ -120,7 +120,7 @@ class InstanceManagerClient {
    * Request to join instance
    */
   requestJoin(instanceId) {
-    emitNet('ng-core:instance-request-join', instanceId);
+    emitNet('ng_core:instance-request-join', instanceId);
   }
 
   /**
@@ -128,7 +128,7 @@ class InstanceManagerClient {
    */
   requestLeave() {
     if (this.currentInstance) {
-      emitNet('ng-core:instance-request-leave');
+      emitNet('ng_core:instance-request-leave');
     }
   }
 

@@ -23,8 +23,8 @@ Thank you for your interest in contributing to the NextGen Core framework!
 1. Fork the repository
 2. Clone your fork:
 ```bash
-git clone https://github.com/YOUR_USERNAME/ng-core.git
-cd ng-core
+git clone https://github.com/YOUR_USERNAME/ng_core.git
+cd ng_core
 ```
 
 3. Install dependencies:
@@ -205,8 +205,8 @@ CREATE TABLE your_table (...);
 1. **Start test environment**:
 ```bash
 # In FiveM server directory
-ensure ng-core
-ensure ng-test
+ensure ng_core
+ensure ng_test
 ```
 
 2. **Check console for errors**:
@@ -215,7 +215,7 @@ ensure ng-test
 
 3. **Run test suite**:
 ```bash
-ensure ng-test  # Auto-runs tests after 5 seconds
+ensure ng_test  # Auto-runs tests after 5 seconds
 ```
 
 ### What to Test
@@ -319,7 +319,7 @@ yarn lint
 
 3. **Test thoroughly**:
    - Start server with your changes
-   - Run ng-test
+   - Run ng_test
    - Test manually
 
 4. **Commit changes**:
@@ -338,7 +338,7 @@ git push origin feature/your-feature-name
 
 - [ ] Code follows style guidelines
 - [ ] ESLint passes (`yarn lint`)
-- [ ] All tests pass (ng-test)
+- [ ] All tests pass (ng_test)
 - [ ] Documentation updated
 - [ ] Commit messages follow convention
 - [ ] No breaking changes (or documented)

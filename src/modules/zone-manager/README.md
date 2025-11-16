@@ -283,13 +283,13 @@ zoneManager.rebuildSpatial();
 const json = zoneManager.exportZones();
 
 // Save to file
-SaveResourceFile('ng-core', 'zones.json', json, -1);
+SaveResourceFile('ng_core', 'zones.json', json, -1);
 ```
 
 ### Import Zones
 
 ```javascript
-const json = LoadResourceFile('ng-core', 'zones.json');
+const json = LoadResourceFile('ng_core', 'zones.json');
 zoneManager.importZones(json);
 ```
 
@@ -525,7 +525,7 @@ const info = await Framework.rpc.callServer('zone:getInfo', zoneId);
 
 ## Examples
 
-See the complete examples in [ng-demo](../../ng-demo/) plugin.
+See the complete examples in [ng_demo](../../ng_demo/) plugin.
 
 ---
 

@@ -40,11 +40,11 @@ class ChatCommandsModule {
       } else {
         // Internal module - try to detect from stack
         const stack = new Error().stack;
-        const moduleMatch = stack.match(/ng-core[\\/]src[\\/]modules[\\/]([^[\\/]+)[\\/]/);
+        const moduleMatch = stack.match(/ng_core[\\/]src[\\/]modules[\\/]([^[\\/]+)[\\/]/);
         if (moduleMatch) {
-          pluginName = `ng-core:${moduleMatch[1]}`;
+          pluginName = `ng_core:${moduleMatch[1]}`;
         } else {
-          pluginName = 'ng-core';
+          pluginName = 'ng_core';
         }
       }
     }

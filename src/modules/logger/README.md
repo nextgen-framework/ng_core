@@ -81,7 +81,7 @@ const errors = await logger.getLogs({
 
 // Get logs for specific resource
 const resourceLogs = await logger.getLogs({
-  resource: 'ng-core',
+  resource: 'ng_core',
   limit: 100
 });
 
@@ -124,9 +124,9 @@ logger.setLevel('warn'); // Only show warn, error, fatal
 Colored console output with timestamps:
 
 ```
-[14:23:45] [ng-core] INFO    Player connected {"name":"John","id":1}
-[14:23:50] [ng-core] WARN    Low memory warning
-[14:23:55] [ng-core] ERROR   Database connection failed
+[14:23:45] [ng_core] INFO    Player connected {"name":"John","id":1}
+[14:23:50] [ng_core] WARN    Low memory warning
+[14:23:55] [ng_core] ERROR   Database connection failed
 ```
 
 ### Database Output
@@ -141,7 +141,7 @@ Logs are stored in `logs` collection:
 {
   level: 'error',
   message: 'Database query failed',
-  resource: 'ng-core',
+  resource: 'ng_core',
   metadata: { query: 'SELECT...', error: '...' },
   timestamp: 1234567890,
   _created_at: '2024-01-15T14:23:45.123Z'

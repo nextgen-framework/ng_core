@@ -119,7 +119,7 @@ class AdminManager {
     // Noclip command
     chatCommands.register('noclip', (source, args) => {
       if (!this.isAdmin(source)) return;
-      emitNet('ng-core:admin-noclip', source);
+      emitNet('ng_core:admin-noclip', source);
     });
   }
 

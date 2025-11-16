@@ -168,7 +168,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng-core:money-update', source, type, money[type]);
+    emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Set ${type} for player ${source}: ${oldAmount} -> ${money[type]}`, 'info', { reason });
 
@@ -208,7 +208,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng-core:money-update', source, type, money[type]);
+    emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Added ${actualAdded} ${type} to player ${source}`, 'debug', { reason });
 
@@ -244,7 +244,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng-core:money-update', source, type, money[type]);
+    emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Removed ${amount} ${type} from player ${source}`, 'debug', { reason });
 
@@ -322,8 +322,8 @@ class MoneyManager {
       await this.logTransaction(source, null, 'bank', amount, 'deposit', 'atm');
     }
 
-    emitNet('ng-core:money-update', source, 'cash', money.cash);
-    emitNet('ng-core:money-update', source, 'bank', money.bank);
+    emitNet('ng_core:money-update', source, 'cash', money.cash);
+    emitNet('ng_core:money-update', source, 'bank', money.bank);
 
     this.log(`Player ${source} deposited ${amount} to bank`, 'debug');
 
@@ -358,8 +358,8 @@ class MoneyManager {
       await this.logTransaction(source, null, 'cash', amount, 'withdraw', 'atm');
     }
 
-    emitNet('ng-core:money-update', source, 'cash', money.cash);
-    emitNet('ng-core:money-update', source, 'bank', money.bank);
+    emitNet('ng_core:money-update', source, 'cash', money.cash);
+    emitNet('ng_core:money-update', source, 'bank', money.bank);
 
     this.log(`Player ${source} withdrew ${amount} from bank`, 'debug');
 

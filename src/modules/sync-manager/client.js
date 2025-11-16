@@ -13,18 +13,18 @@ class SyncManagerClient {
    */
   init() {
     // Listen for time updates
-    onNet('ng-core:time-set', this.onTimeSet.bind(this));
+    onNet('ng_core:time-set', this.onTimeSet.bind(this));
 
     // Listen for weather updates
-    onNet('ng-core:weather-set', this.onWeatherSet.bind(this));
-    onNet('ng-core:weather-transition', this.onWeatherTransition.bind(this));
+    onNet('ng_core:weather-set', this.onWeatherSet.bind(this));
+    onNet('ng_core:weather-transition', this.onWeatherTransition.bind(this));
 
     // Listen for blackout updates
-    onNet('ng-core:blackout-set', this.onBlackoutSet.bind(this));
+    onNet('ng_core:blackout-set', this.onBlackoutSet.bind(this));
 
     // Listen for density updates
-    onNet('ng-core:traffic-density-set', this.onTrafficDensitySet.bind(this));
-    onNet('ng-core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
+    onNet('ng_core:traffic-density-set', this.onTrafficDensitySet.bind(this));
+    onNet('ng_core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
 
     console.log('[Sync Manager] Client initialized');
   }

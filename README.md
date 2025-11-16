@@ -23,10 +23,10 @@ Build RP, Racing, Creative, PvP, or anything else. Zero assumptions. Full contro
 
 ```bash
 # 1. Place in resources folder
-resources/[ng]/ng-core/
+resources/[ng]/ng_core/
 
 # 2. Add to server.cfg
-ensure ng-core
+ensure ng_core
 
 # 3. Start server
 ```
@@ -82,7 +82,7 @@ Framework initialized successfully!
 /help [command]          - Show help (h, ?)
 ```
 
-All other commands are provided by plugins (ng-demo, ng-test, or your own plugins).
+All other commands are provided by plugins (ng_demo, ng_test, or your own plugins).
 
 ---
 
@@ -188,14 +188,14 @@ game 'gta5'
 server_scripts { 'server.js' }
 client_scripts { 'client.js' }
 
-dependency 'ng-core'
+dependency 'ng_core'
 ```
 
 ### Load It
 
 ```lua
 # server.cfg
-ensure ng-core
+ensure ng_core
 ensure my-plugin
 ```
 
@@ -319,24 +319,24 @@ console.log(`${stats.started}/${stats.total} resources`);
 
 ## 🧪 Demo & Testing
 
-### ng-demo
+### ng_demo
 Complete demo plugin with:
 - Commands: `/demo`, `/demomoney`, `/demoteleport`, `/demovehicle`
 - UI: Press F9 (stats display), F10 (performance overlay)
 - RPC examples, notifications, teleports, vehicles
 
 ```lua
-ensure ng-demo
+ensure ng_demo
 ```
 
-### ng-test
+### ng_test
 Automated test suite:
 - 20+ server tests
 - 22+ client tests
 - Auto-runs after 5 seconds
 
 ```lua
-ensure ng-test
+ensure ng_test
 ```
 
 ---
@@ -379,7 +379,7 @@ Phase 3: Plugins
 | 10-19 | Framework | rpc, player-manager, chat-commands |
 | 20-49 | Features | notifications, performance |
 | 50-99 | Custom modules | Your modules |
-| 100+ | Plugins | ng-demo, ng-test, your plugins |
+| 100+ | Plugins | ng_demo, ng_test, your plugins |
 
 ---
 
@@ -481,8 +481,8 @@ Free to use and modify
 
 ## 🔗 Links
 
-- **Demo**: `resources/[ng]/ng-demo/`
-- **Tests**: `resources/[ng]/ng-test/`
+- **Demo**: `resources/[ng]/ng_demo/`
+- **Tests**: `resources/[ng]/ng_test/`
 - **Docs**: `/docs/`
 
 ---

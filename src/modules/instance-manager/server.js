@@ -158,7 +158,7 @@ class InstanceManager {
     });
 
     // Emit event
-    emitNet('ng-core:instance-joined', source, instanceId, instance.type);
+    emitNet('ng_core:instance-joined', source, instanceId, instance.type);
 
     // Trigger cleanup check
     if (this.config.autoCleanupEmpty) {
@@ -200,7 +200,7 @@ class InstanceManager {
     });
 
     // Emit event
-    emitNet('ng-core:instance-left', source, instanceId);
+    emitNet('ng_core:instance-left', source, instanceId);
 
     // Auto cleanup if empty
     if (this.config.autoCleanupEmpty && instance.players.size === 0) {
@@ -320,7 +320,7 @@ class InstanceManager {
     }
 
     // Send invitation to client
-    emitNet('ng-core:instance-invite', source, instanceId, instance.type, instance.metadata);
+    emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
 
     this.log(`Player ${source} invited to instance ${instanceId}`, 'debug');
 

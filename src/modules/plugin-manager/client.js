@@ -46,7 +46,7 @@ class PluginManager {
         return;
       }
 
-      // Check if this resource is an ng-core plugin
+      // Check if this resource is an ng_core plugin
       await this.detectAndLoadExternalPlugin(resourceName);
     });
 
@@ -72,10 +72,10 @@ class PluginManager {
   }
 
   /**
-   * Scan already started resources for ng-core plugins
+   * Scan already started resources for ng_core plugins
    */
   async scanExistingResources() {
-    this.framework.utils.Log('Scanning existing resources for ng-core plugins...', 'info');
+    this.framework.utils.Log('Scanning existing resources for ng_core plugins...', 'info');
 
     const numResources = GetNumResources();
     let detectedCount = 0;

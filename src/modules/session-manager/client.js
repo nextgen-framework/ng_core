@@ -15,16 +15,16 @@ class SessionManagerClient {
    */
   init() {
     // Listen for session events
-    onNet('ng-core:session-created', this.onSessionCreated.bind(this));
-    onNet('ng-core:session-joined', this.onSessionJoined.bind(this));
-    onNet('ng-core:session-left', this.onSessionLeft.bind(this));
-    onNet('ng-core:session-started', this.onSessionStarted.bind(this));
-    onNet('ng-core:session-ended', this.onSessionEnded.bind(this));
-    onNet('ng-core:session-player-joined', this.onPlayerJoined.bind(this));
-    onNet('ng-core:session-player-left', this.onPlayerLeft.bind(this));
-    onNet('ng-core:session-host-changed', this.onHostChanged.bind(this));
-    onNet('ng-core:session-spectating', this.onSpectating.bind(this));
-    onNet('ng-core:session-spectating-ended', this.onSpectatingEnded.bind(this));
+    onNet('ng_core:session-created', this.onSessionCreated.bind(this));
+    onNet('ng_core:session-joined', this.onSessionJoined.bind(this));
+    onNet('ng_core:session-left', this.onSessionLeft.bind(this));
+    onNet('ng_core:session-started', this.onSessionStarted.bind(this));
+    onNet('ng_core:session-ended', this.onSessionEnded.bind(this));
+    onNet('ng_core:session-player-joined', this.onPlayerJoined.bind(this));
+    onNet('ng_core:session-player-left', this.onPlayerLeft.bind(this));
+    onNet('ng_core:session-host-changed', this.onHostChanged.bind(this));
+    onNet('ng_core:session-spectating', this.onSpectating.bind(this));
+    onNet('ng_core:session-spectating-ended', this.onSpectatingEnded.bind(this));
 
     console.log('[Session Manager] Client initialized');
   }
@@ -194,14 +194,14 @@ class SessionManagerClient {
    * Request to create session
    */
   createSession(type, options) {
-    emitNet('ng-core:session-create', type, options);
+    emitNet('ng_core:session-create', type, options);
   }
 
   /**
    * Request to join session
    */
   joinSession(sessionId) {
-    emitNet('ng-core:session-join', sessionId);
+    emitNet('ng_core:session-join', sessionId);
   }
 
   /**
@@ -209,7 +209,7 @@ class SessionManagerClient {
    */
   leaveSession() {
     if (this.currentSession) {
-      emitNet('ng-core:session-leave');
+      emitNet('ng_core:session-leave');
     }
   }
 
@@ -218,7 +218,7 @@ class SessionManagerClient {
    */
   startSession() {
     if (this.currentSession && this.currentSession.isHost) {
-      emitNet('ng-core:session-start');
+      emitNet('ng_core:session-start');
     }
   }
 }

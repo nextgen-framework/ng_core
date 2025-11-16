@@ -35,7 +35,7 @@
 ### Test Environment
 
 - FiveM Server Version:
-- ng-core Version:
+- ng_core Version:
 - Node.js Version:
 
 ### Manual Testing Steps
@@ -48,7 +48,7 @@
 
 - [ ] All existing tests pass
 - [ ] New tests added (if applicable)
-- [ ] ng-test passes without errors
+- [ ] ng_test passes without errors
 
 ### Test Results
 

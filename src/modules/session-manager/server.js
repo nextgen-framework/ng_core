@@ -172,7 +172,7 @@ class SessionManager {
     this.log(`Created session: ${sessionId} (type: ${type}, host: ${host})`, 'info');
 
     // Emit event
-    emitNet('ng-core:session-created', host, sessionId, type);
+    emitNet('ng_core:session-created', host, sessionId, type);
 
     return { success: true, sessionId, instanceId };
   }
@@ -248,8 +248,8 @@ class SessionManager {
     this.log(`Player ${source} joined session ${sessionId}`, 'debug');
 
     // Emit event
-    emitNet('ng-core:session-joined', source, sessionId, session.type);
-    this.broadcastToSession(sessionId, 'ng-core:session-player-joined', source);
+    emitNet('ng_core:session-joined', source, sessionId, session.type);
+    this.broadcastToSession(sessionId, 'ng_core:session-player-joined', source);
 
     return { success: true };
   }
@@ -280,8 +280,8 @@ class SessionManager {
     this.log(`Player ${source} left session ${sessionId} (${reason})`, 'debug');
 
     // Emit event
-    emitNet('ng-core:session-left', source, sessionId, reason);
-    this.broadcastToSession(sessionId, 'ng-core:session-player-left', source, reason);
+    emitNet('ng_core:session-left', source, sessionId, reason);
+    this.broadcastToSession(sessionId, 'ng_core:session-player-left', source, reason);
 
     // Check if session should be ended
     if (session.players.size === 0) {
@@ -290,7 +290,7 @@ class SessionManager {
       // Transfer host to another player
       const newHost = Array.from(session.players)[0];
       session.host = newHost;
-      this.broadcastToSession(sessionId, 'ng-core:session-host-changed', newHost);
+      this.broadcastToSession(sessionId, 'ng_core:session-host-changed', newHost);
     }
 
     return { success: true };
@@ -319,7 +319,7 @@ class SessionManager {
 
     this.log(`Player ${source} is now spectating session ${sessionId}`, 'debug');
 
-    emitNet('ng-core:session-spectating', source, sessionId);
+    emitNet('ng_core:session-spectating', source, sessionId);
 
     return { success: true };
   }
@@ -337,7 +337,7 @@ class SessionManager {
           await this.instanceManager.removePlayerFromInstance(source);
         }
 
-        emitNet('ng-core:session-spectating-ended', source, sessionId);
+        emitNet('ng_core:session-spectating-ended', source, sessionId);
         return { success: true };
       }
     }
@@ -368,7 +368,7 @@ class SessionManager {
 
     this.log(`Session ${sessionId} started`, 'info');
 
-    this.broadcastToSession(sessionId, 'ng-core:session-started', sessionId);
+    this.broadcastToSession(sessionId, 'ng_core:session-started', sessionId);
 
     return { success: true };
   }
@@ -388,7 +388,7 @@ class SessionManager {
 
     this.log(`Session ${sessionId} ended`, 'info');
 
-    this.broadcastToSession(sessionId, 'ng-core:session-ended', sessionId, results);
+    this.broadcastToSession(sessionId, 'ng_core:session-ended', sessionId, results);
 
     // Auto-delete after a delay
     setTimeout(() => {

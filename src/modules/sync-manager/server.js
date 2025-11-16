@@ -230,7 +230,7 @@ class SyncManager {
       this.state.weather.transition = weatherType;
 
       // Sync transition to all clients
-      emitNet('ng-core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
+      emitNet('ng_core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
 
       // Update current weather after transition
       setTimeout(() => {
@@ -241,7 +241,7 @@ class SyncManager {
       this.log(`Weather transitioning to ${weatherType}`, 'debug');
     } else {
       this.state.weather.current = weatherType;
-      emitNet('ng-core:weather-set', -1, weatherType);
+      emitNet('ng_core:weather-set', -1, weatherType);
       this.log(`Weather set to ${weatherType}`, 'info');
     }
   }
@@ -281,7 +281,7 @@ class SyncManager {
    */
   setBlackout(enabled) {
     this.state.blackout = enabled;
-    emitNet('ng-core:blackout-set', -1, enabled);
+    emitNet('ng_core:blackout-set', -1, enabled);
     this.log(`Blackout ${enabled ? 'enabled' : 'disabled'}`, 'info');
   }
 
@@ -301,7 +301,7 @@ class SyncManager {
    */
   setTrafficDensity(density) {
     this.state.trafficDensity = Math.max(0, Math.min(1, density));
-    emitNet('ng-core:traffic-density-set', -1, this.state.trafficDensity);
+    emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
     this.log(`Traffic density set to ${this.state.trafficDensity}`, 'info');
   }
 
@@ -310,7 +310,7 @@ class SyncManager {
    */
   setPedestrianDensity(density) {
     this.state.pedestrianDensity = Math.max(0, Math.min(1, density));
-    emitNet('ng-core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
     this.log(`Pedestrian density set to ${this.state.pedestrianDensity}`, 'info');
   }
 
@@ -347,34 +347,34 @@ class SyncManager {
    */
   syncToAll() {
     this.syncTimeToAll(false);
-    emitNet('ng-core:weather-set', -1, this.state.weather.current);
-    emitNet('ng-core:blackout-set', -1, this.state.blackout);
-    emitNet('ng-core:traffic-density-set', -1, this.state.trafficDensity);
-    emitNet('ng-core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    emitNet('ng_core:weather-set', -1, this.state.weather.current);
+    emitNet('ng_core:blackout-set', -1, this.state.blackout);
+    emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
+    emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
   }
 
   /**
    * Sync current state to specific player
    */
   syncToPlayer(source) {
-    emitNet('ng-core:time-set', source,
+    emitNet('ng_core:time-set', source,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,
       this.state.time.frozen,
       false // No transition
     );
-    emitNet('ng-core:weather-set', source, this.state.weather.current);
-    emitNet('ng-core:blackout-set', source, this.state.blackout);
-    emitNet('ng-core:traffic-density-set', source, this.state.trafficDensity);
-    emitNet('ng-core:pedestrian-density-set', source, this.state.pedestrianDensity);
+    emitNet('ng_core:weather-set', source, this.state.weather.current);
+    emitNet('ng_core:blackout-set', source, this.state.blackout);
+    emitNet('ng_core:traffic-density-set', source, this.state.trafficDensity);
+    emitNet('ng_core:pedestrian-density-set', source, this.state.pedestrianDensity);
   }
 
   /**
    * Sync time to all clients
    */
   syncTimeToAll(transition) {
-    emitNet('ng-core:time-set', -1,
+    emitNet('ng_core:time-set', -1,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,

@@ -248,7 +248,7 @@ class AccessManager {
       this.log(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`, 'debug');
 
       // Sync to all clients
-      emitNet('ng-core:door-state-changed', -1, doorId, newState);
+      emitNet('ng_core:door-state-changed', -1, doorId, newState);
 
       return { success: true, locked: newState };
     } catch (error) {

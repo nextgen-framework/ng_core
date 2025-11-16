@@ -192,7 +192,7 @@ class SpawnManager {
     // If spawn selection is enabled, send available spawns to client
     if (this.config.enableSpawnSelection) {
       const availableSpawns = await this.getAvailableSpawnsForPlayer(source);
-      emitNet('ng-core:spawn-select', source, availableSpawns);
+      emitNet('ng_core:spawn-select', source, availableSpawns);
     } else {
       // Spawn at default location
       const defaultSpawn = this.getDefaultSpawn();
@@ -274,7 +274,7 @@ class SpawnManager {
    */
   spawnPlayerAt(source, coords) {
     // Send spawn command to client
-    emitNet('ng-core:spawn-at', source, coords, {
+    emitNet('ng_core:spawn-at', source, coords, {
       fadeIn: this.config.spawnFadeIn,
       fadeDuration: this.config.spawnFadeDuration
     });

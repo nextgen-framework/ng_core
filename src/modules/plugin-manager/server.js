@@ -97,7 +97,7 @@ class PluginManager {
         return;
       }
 
-      // Check if this resource is an ng-core plugin
+      // Check if this resource is an ng_core plugin
       await this.detectAndLoadExternalPlugin(resourceName);
     });
 
@@ -123,11 +123,11 @@ class PluginManager {
   }
 
   /**
-   * Scan already started resources for ng-core plugins
+   * Scan already started resources for ng_core plugins
    * Plugins are loaded in priority order (lower number = loads first)
    */
   async scanExistingResources() {
-    global.NextGenUtils.Log('Scanning existing resources for ng-core plugins...', 'info');
+    global.NextGenUtils.Log('Scanning existing resources for ng_core plugins...', 'info');
 
     const numResources = GetNumResources();
     const detectedPlugins = [];
@@ -189,7 +189,7 @@ class PluginManager {
   }
 
   /**
-   * Detect if a resource is an ng-core plugin (without loading it)
+   * Detect if a resource is an ng_core plugin (without loading it)
    * @param {string} resourceName - FiveM resource name
    * @returns {Promise<Object|null>} Plugin info or null if not a plugin
    */
@@ -201,7 +201,7 @@ class PluginManager {
         return null;
       }
 
-      // Check if the resource has a marker file indicating it's an ng-core plugin
+      // Check if the resource has a marker file indicating it's an ng_core plugin
       const markerPath = path.join(resourcePath, 'ng-plugin.json');
 
       if (!fs.existsSync(markerPath)) {
@@ -231,7 +231,7 @@ class PluginManager {
   }
 
   /**
-   * Detect if a resource is an ng-core plugin and load it
+   * Detect if a resource is an ng_core plugin and load it
    * @param {string} resourceName - FiveM resource name
    * @returns {Promise<boolean>} True if plugin was detected and loaded
    */
@@ -244,11 +244,11 @@ class PluginManager {
         return false;
       }
 
-      // Check if the resource has a marker file indicating it's an ng-core plugin
+      // Check if the resource has a marker file indicating it's an ng_core plugin
       const markerPath = path.join(resourcePath, 'ng-plugin.json');
 
       if (!fs.existsSync(markerPath)) {
-        // Not an ng-core plugin, skip
+        // Not an ng_core plugin, skip
         return false;
       }
 
