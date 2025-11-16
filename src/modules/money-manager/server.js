@@ -35,13 +35,11 @@ class MoneyManager {
 
     // Handle player joining
     on('playerJoining', async () => {
-      const source = global.source;
       await this.loadPlayerMoney(source);
     });
 
     // Handle player dropping
     on('playerDropped', async () => {
-      const source = global.source;
       await this.savePlayerMoney(source);
       this.playerMoney.delete(source);
     });

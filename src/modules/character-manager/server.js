@@ -43,7 +43,6 @@ class CharacterManager {
 
     // Handle player drop
     on('playerDropped', () => {
-      const source = global.source;
       this.activeCharacters.delete(source);
     });
 

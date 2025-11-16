@@ -28,7 +28,6 @@ class PlayerManager {
       deferrals.update('Checking with framework...');
 
       try {
-        const source = global.source;
 
         // Run hooks
         await this.framework.runHook(this.framework.constants.Hooks.BEFORE_PLAYER_JOIN, source, deferrals);
@@ -42,7 +41,6 @@ class PlayerManager {
 
     // Player joined
     on('playerJoining', async () => {
-      const source = global.source;
       await this.create(source);
       this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, source);
       await this.framework.runHook(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, source);
@@ -50,7 +48,6 @@ class PlayerManager {
 
     // Player dropped
     on('playerDropped', async (reason) => {
-      const source = global.source;
 
       await this.framework.runHook(this.framework.constants.Hooks.BEFORE_PLAYER_LEAVE, source, reason);
       await this.remove(source);

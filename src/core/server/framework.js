@@ -14,6 +14,43 @@ class NextGenFramework {
 
     // Core: Only EventBus (ultra-minimal)
     this.eventBus = null;
+
+    // Consolidated native event handlers (optimization to avoid max listeners warning)
+    this.nativeHandlers = new Map();
+    this.setupNativeEventListeners();
+  }
+
+  /**
+   * Setup consolidated native FiveM event listeners
+   * This is an optimization: instead of 11+ modules each calling on('playerDropped'),
+   * we have ONE listener that distributes to all registered handlers
+   */
+  setupNativeEventListeners() {
+    // Consolidated playerDropped listener
+    on('playerDropped', (reason) => {
+      const source = global.source;
+      const handlers = this.nativeHandlers.get('playerDropped') || [];
+      handlers.forEach(handler => {
+        try {
+          handler(source, reason);
+        } catch (error) {
+          this.utils.Log(`playerDropped handler error: ${error.message}`, 'error');
+        }
+      });
+    });
+  }
+
+  /**
+   * Register a handler for a native FiveM event (consolidated)
+   * Modules should use this instead of calling on() directly for better performance
+   * @param {string} eventName - The native event name (e.g., 'playerDropped')
+   * @param {Function} handler - The handler function
+   */
+  onNative(eventName, handler) {
+    if (!this.nativeHandlers.has(eventName)) {
+      this.nativeHandlers.set(eventName, []);
+    }
+    this.nativeHandlers.get(eventName).push(handler);
   }
 
   /**

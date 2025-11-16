@@ -80,6 +80,10 @@ exports {
 server_exports {
   'GetFramework',
   'IsReady',
+  'GetModule',
+  'RegisterCommand',
+  'SendMessage',
+  'BroadcastMessage',
   'RegisterPlugin',
   'LoadPluginFromResource'
 }
@@ -87,6 +91,8 @@ server_exports {
 client_exports {
   'GetFramework',
   'IsReady',
+  'GetModule',
+  'RegisterRPC',
   'RegisterPlugin',
   'LoadPluginFromResource'
 }

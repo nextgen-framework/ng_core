@@ -37,7 +37,6 @@ class InstanceManager {
 
     // Handle player drops
     on('playerDropped', () => {
-      const source = global.source;
       this.handlePlayerLeft(source);
     });
 

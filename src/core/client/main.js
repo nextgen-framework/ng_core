@@ -50,6 +50,26 @@ exports('IsReady', () => {
   return frameworkReady;
 });
 
+// Export to get a specific module
+exports('GetModule', (moduleName) => {
+  if (!global.Framework) {
+    return null;
+  }
+  return global.Framework.getModule(moduleName);
+});
+
+// Export helper: Register RPC handler
+exports('RegisterRPC', (name, handler) => {
+  if (!global.Framework) {
+    throw new Error('Framework not ready');
+  }
+  const rpc = global.Framework.getModule('rpc');
+  if (!rpc) {
+    throw new Error('rpc module not loaded');
+  }
+  return rpc.register(name, handler);
+});
+
 // Export plugin registration for external resources
 exports('RegisterPlugin', async (pluginName, pluginInstance) => {
   if (!global.Framework) {

@@ -21,7 +21,9 @@ const Config = {
     { name: 'persistence', priority: 3 },       // Persistence manager (after database)
     { name: 'rpc', priority: 5 },
     { name: 'whitelist', priority: 8 },         // Whitelist (before player-manager) - Disabled by default, enable with setr ngcore_whitelist_enabled "true"
+    { name: 'connection-manager', priority: 8 }, // Connection stages manager (before queue)
     { name: 'queue', priority: 9 },             // Queue (after whitelist, before player-manager)
+    { name: 'hardcap', priority: 10 },          // Enforce player limit (after queue, works with queue module)
     { name: 'access-manager', priority: 11 },   // Access control (keys, doors, locks)
     { name: 'admin-manager', priority: 11 },    // Admin tools
     { name: 'player-manager', priority: 10 },

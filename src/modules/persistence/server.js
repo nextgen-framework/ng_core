@@ -49,7 +49,6 @@ class PersistenceManager {
     // Save on player disconnect
     if (this.config.saveOnDisconnect) {
       on('playerDropped', async (reason) => {
-        const source = global.source;
         await this.savePlayerData(source, 'disconnect');
       });
     }

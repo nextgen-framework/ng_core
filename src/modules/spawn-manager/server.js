@@ -70,13 +70,11 @@ class SpawnManager {
 
     // Handle player spawn
     on('playerJoining', () => {
-      const source = global.source;
       setTimeout(() => this.handlePlayerSpawn(source), 1000);
     });
 
     // Save last position on disconnect
     on('playerDropped', () => {
-      const source = global.source;
       this.saveLastPosition(source);
     });
 
