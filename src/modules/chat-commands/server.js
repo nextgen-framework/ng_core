@@ -106,17 +106,20 @@ class ChatCommandsModule {
     // Add suggestion for autocompletion
     const params = command.params.map(param => {
       return {
-        name: param.name,
+        name: param.name || '',
         help: param.help || ''
       };
     });
 
-    TriggerClientEvent('chat:addSuggestion', -1, `/${command.name}`, command.description, params);
+    // Only send suggestions if we have a valid description (prevent null argument errors)
+    if (command.description) {
+      TriggerClientEvent('chat:addSuggestion', -1, `/${command.name}`, command.description, params);
 
-    // Add suggestions for aliases
-    command.aliases.forEach(alias => {
-      TriggerClientEvent('chat:addSuggestion', -1, `/${alias}`, `${command.description} (alias)`, params);
-    });
+      // Add suggestions for aliases
+      command.aliases.forEach(alias => {
+        TriggerClientEvent('chat:addSuggestion', -1, `/${alias}`, `${command.description} (alias)`, params);
+      });
+    }
 
     // Log with plugin info
     const pluginInfo = command.plugin !== 'unknown' ? ` [${command.plugin}]` : '';
@@ -135,6 +138,12 @@ class ChatCommandsModule {
    * Send message to player
    */
   sendMessage(source, message) {
+    // Validate source before sending
+    if (!source || source < 0) {
+      this.framework.utils.Log(`Invalid source in sendMessage: ${source}`, 'warn');
+      return;
+    }
+
     TriggerClientEvent('chat:addMessage', source, {
       color: [255, 255, 255],
       multiline: true,
