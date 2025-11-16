@@ -70,12 +70,15 @@ class SpawnManager {
 
     // Handle player spawn
     on('playerJoining', () => {
-      setTimeout(() => this.handlePlayerSpawn(source), 1000);
+      // Capture source before setTimeout to avoid scope issues
+      const playerSource = source;
+      setTimeout(() => this.handlePlayerSpawn(playerSource), 1000);
     });
 
     // Save last position on disconnect
     on('playerDropped', () => {
-      this.saveLastPosition(source);
+      const playerSource = source;
+      this.saveLastPosition(playerSource);
     });
 
     // RPC handlers
