@@ -40,6 +40,7 @@ const Constants = {
     // Player connection stages
     PLAYER_CONNECTING: 'player:connecting',           // Initial connection (queue check)
     PLAYER_LOADING: 'player:loading',                 // Loading stage (SQL queries, data loading)
+    PLAYER_WAITING_CLIENT: 'player:waiting:client',   // Waiting for client to be ready (framework + appearance)
     PLAYER_CHECK_PERMISSIONS: 'player:check:permissions', // Permission/whitelist checks
     PLAYER_READY_TO_SPAWN: 'player:ready:spawn',     // Ready to spawn (all checks passed)
     PLAYER_SPAWNED: 'player:spawned'                  // Player has spawned in game
@@ -49,6 +50,7 @@ const Constants = {
   PlayerStage: {
     CONNECTING: 'connecting',       // In queue or connecting
     LOADING: 'loading',            // Loading player data (SQL, etc.)
+    WAITING_CLIENT: 'waiting_client', // Waiting for client ready
     CHECKING: 'checking',          // Running permission/whitelist checks
     READY: 'ready',                // Ready to spawn
     SPAWNED: 'spawned',            // Spawned in game

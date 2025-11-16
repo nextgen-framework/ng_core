@@ -18,10 +18,34 @@ class ConnectionManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.clientReadyResolvers = new Map();
 
     // Handle player drops
     this.framework.onNative('playerDropped', (source, reason) => {
       this.handlePlayerDropped(source, reason);
+    });
+
+    // Handle client ready signals
+    onNet('ng_core:client-ready', () => {
+      const clientSource = source;
+
+      // Get player identifiers to match against waiting resolvers
+      const player = this.framework.getModule('player-manager')?.get(clientSource);
+      const license = player?.identifiers?.license;
+
+      console.log(`[NextGen] [Connection] Received client-ready signal from ${clientSource} (${license})`);
+
+      // Find resolver by license
+      if (license) {
+        const resolver = this.clientReadyResolvers.get(license);
+        if (resolver) {
+          resolver(true);
+        } else {
+          console.log(`[NextGen] [Connection] No resolver found for license ${license}`);
+        }
+      } else {
+        console.log(`[NextGen] [Connection] Could not get license for source ${clientSource}`);
+      }
     });
 
     this.log('Connection Manager initialized', 'info');
@@ -97,71 +121,13 @@ class ConnectionManager {
         return false;
       }
 
-      deferrals.update('Checking permissions...');
-
-      // Execute PLAYER_CHECK_PERMISSIONS hook
-      const permissionResult = await this.executeStage(
-        source,
-        this.framework.constants.PlayerStage.CHECKING,
-        this.framework.constants.Hooks.PLAYER_CHECK_PERMISSIONS,
-        { source, identifiers, playerData: loadingResult.data }
-      );
-
-      if (!permissionResult.success) {
-        deferrals.done(permissionResult.reason || 'Permission check failed');
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        return false;
-      }
-
-      // Check if player still connected after permissions
-      if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected during permission check`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        return false;
-      }
-
-      deferrals.update('Preparing to spawn...');
-
-      // Execute PLAYER_READY_TO_SPAWN hook
-      const readyResult = await this.executeStage(
-        source,
-        this.framework.constants.PlayerStage.READY,
-        this.framework.constants.Hooks.PLAYER_READY_TO_SPAWN,
-        { source, identifiers, playerData: loadingResult.data }
-      );
-
-      if (!readyResult.success) {
-        deferrals.done(readyResult.reason || 'Failed to prepare spawn');
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        return false;
-      }
-
-      // Final check before allowing spawn
-      if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected before spawn`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        return false;
-      }
-
-      // All stages passed - allow connection
+      // All pre-connection stages passed - allow client to connect
+      // Post-connection stages will happen in continueConnectionProcess()
       deferrals.done();
 
-      // Mark as spawned (will be confirmed by client)
-      this.setPlayerStage(source, this.framework.constants.PlayerStage.SPAWNED);
-
-      const totalTime = Date.now() - this.playerStages.get(source).startedAt;
-      console.log(`[NextGen] [Connection] Player ${identifiers.license} completed all stages in ${totalTime}ms`);
-
-      // Execute PLAYER_SPAWNED hook (after spawn)
+      // Start post-connection stages asynchronously (after playerJoining)
       setImmediate(async () => {
-        await this.framework.runHook(
-          this.framework.constants.Hooks.PLAYER_SPAWNED,
-          { source, identifiers, playerData: this.playerData.get(source) }
-        );
+        await this.continueConnectionProcess(source, identifiers, loadingResult.data);
       });
 
       return true;
@@ -170,6 +136,94 @@ class ConnectionManager {
       deferrals.done(`Connection failed: ${error.message}`);
       this.playerStages.delete(source);
       this.playerData.delete(source);
+      return false;
+    }
+  }
+
+  /**
+   * Continue connection process after player has joined
+   * Handles post-connection stages: WAITING_CLIENT, CHECKING, READY, SPAWNED
+   */
+  async continueConnectionProcess(source, identifiers, playerData) {
+    try {
+      console.log(`[NextGen] [Connection] Continuing connection process for ${source}...`);
+
+      // Wait for client to signal it's ready (appearance applied)
+      const clientReadyResult = await this.waitForClientReady(source, identifiers);
+
+      if (!clientReadyResult.success) {
+        console.log(`[NextGen] [Connection] Client ${source} failed to become ready: ${clientReadyResult.reason}`);
+        this.playerStages.delete(source);
+        this.playerData.delete(source);
+        DropPlayer(source, clientReadyResult.reason || 'Client initialization failed');
+        return false;
+      }
+
+      // Execute PLAYER_CHECK_PERMISSIONS hook
+      const permissionResult = await this.executeStage(
+        source,
+        this.framework.constants.PlayerStage.CHECKING,
+        this.framework.constants.Hooks.PLAYER_CHECK_PERMISSIONS,
+        { source, identifiers, playerData }
+      );
+
+      if (!permissionResult.success) {
+        console.log(`[NextGen] [Connection] Permission check failed for ${source}`);
+        this.playerStages.delete(source);
+        this.playerData.delete(source);
+        DropPlayer(source, permissionResult.reason || 'Permission check failed');
+        return false;
+      }
+
+      if (!this.isPlayerConnected(source)) {
+        console.log(`[NextGen] [Connection] Player ${source} disconnected during permission check`);
+        this.playerStages.delete(source);
+        this.playerData.delete(source);
+        return false;
+      }
+
+      // Execute PLAYER_READY_TO_SPAWN hook
+      const readyResult = await this.executeStage(
+        source,
+        this.framework.constants.PlayerStage.READY,
+        this.framework.constants.Hooks.PLAYER_READY_TO_SPAWN,
+        { source, identifiers, playerData }
+      );
+
+      if (!readyResult.success) {
+        console.log(`[NextGen] [Connection] Spawn preparation failed for ${source}`);
+        this.playerStages.delete(source);
+        this.playerData.delete(source);
+        DropPlayer(source, readyResult.reason || 'Failed to prepare spawn');
+        return false;
+      }
+
+      if (!this.isPlayerConnected(source)) {
+        console.log(`[NextGen] [Connection] Player ${source} disconnected before spawn`);
+        this.playerStages.delete(source);
+        this.playerData.delete(source);
+        return false;
+      }
+
+      // Mark as spawned
+      this.setPlayerStage(source, this.framework.constants.PlayerStage.SPAWNED);
+
+      const stageInfo = this.playerStages.get(source);
+      const totalTime = Date.now() - stageInfo.startedAt;
+      console.log(`[NextGen] [Connection] Player ${identifiers.license} completed all stages in ${totalTime}ms`);
+
+      // Execute PLAYER_SPAWNED hook
+      await this.framework.runHook(
+        this.framework.constants.Hooks.PLAYER_SPAWNED,
+        { source, identifiers, playerData: this.playerData.get(source) }
+      );
+
+      return true;
+    } catch (error) {
+      console.log(`[NextGen] [Connection] Post-connection process failed for ${source}: ${error.message}`);
+      this.playerStages.delete(source);
+      this.playerData.delete(source);
+      DropPlayer(source, `Connection failed: ${error.message}`);
       return false;
     }
   }
@@ -214,10 +268,52 @@ class ConnectionManager {
   }
 
   /**
+   * Wait for client to signal it's ready (framework initialized + appearance applied)
+   */
+  async waitForClientReady(playerSource, identifiers) {
+    return new Promise((resolve) => {
+      // Set waiting stage
+      this.setPlayerStage(playerSource, this.framework.constants.PlayerStage.WAITING_CLIENT);
+      const license = identifiers.license;
+      console.log(`[NextGen] [Connection] Waiting for client ${playerSource} (${license}) to become ready...`);
+
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.log(`[NextGen] [Connection] Client ${playerSource} (${license}) ready timeout`);
+          this.clientReadyResolvers.delete(license);
+          resolve({
+            success: false,
+            reason: 'Client initialization timeout'
+          });
+        }
+      }, 30000); // 30 second timeout
+
+      // Store the resolve function using LICENSE as key (source changes from 65536 to 1)
+      if (!this.clientReadyResolvers) {
+        this.clientReadyResolvers = new Map();
+      }
+      this.clientReadyResolvers.set(license, (success) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          this.clientReadyResolvers.delete(license);
+          console.log(`[NextGen] [Connection] Client ${license} ready signal accepted`);
+          resolve({ success });
+        }
+      });
+    });
+  }
+
+  /**
    * Set player stage
    */
   setPlayerStage(source, stage, data = {}) {
     const existing = this.playerStages.get(source) || {};
+    const playerName = this.getPlayerName(source);
+
     this.playerStages.set(source, {
       ...existing,
       ...data,
@@ -225,7 +321,19 @@ class ConnectionManager {
       updatedAt: Date.now()
     });
 
-    this.log(`Player ${source} -> ${stage}`, 'debug');
+    // Log state changes with player name
+    console.log(`[NextGen] [Connection] Player ${playerName} (${source}) -> Stage: ${stage}`);
+  }
+
+  /**
+   * Get player name safely
+   */
+  getPlayerName(source) {
+    try {
+      return GetPlayerName(source) || `Unknown (${source})`;
+    } catch (e) {
+      return `Unknown (${source})`;
+    }
   }
 
   /**

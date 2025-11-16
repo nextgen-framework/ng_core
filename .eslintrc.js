@@ -120,6 +120,7 @@ module.exports = {
     SetScenarioPedDensityMultiplierThisFrame: 'readonly',
     BeginTextCommandPrint: 'readonly',
     BeginTextCommandThefeedPost: 'readonly',
+    ClearPedProp: 'readonly',
     DoScreenFadeIn: 'readonly',
     DoScreenFadeOut: 'readonly',
     DrawNotification: 'readonly',
@@ -140,18 +141,27 @@ module.exports = {
     GetResourceByFindIndex: 'readonly',
     GetResourceState: 'readonly',
     HasCollisionLoadedAroundEntity: 'readonly',
+    HasModelLoaded: 'readonly',
     NetworkOverrideClockTime: 'readonly',
     NetworkSetEntityInvisibleToNetwork: 'readonly',
     PauseClock: 'readonly',
     Player: 'readonly',
     RenderScriptCams: 'readonly',
     RequestCollisionAtCoord: 'readonly',
+    RequestModel: 'readonly',
     SetCamActive: 'readonly',
+    SetEntityAlpha: 'readonly',
     SetEntityCoordsNoOffset: 'readonly',
     SetEntityVisible: 'readonly',
+    SetModelAsNoLongerNeeded: 'readonly',
     SetNotificationBackgroundColor: 'readonly',
     SetNotificationTextEntry: 'readonly',
+    SetPedComponentVariation: 'readonly',
+    SetPedHairColor: 'readonly',
+    SetPedHeadBlendData: 'readonly',
+    SetPedPropIndex: 'readonly',
     SetPlayerInvincible: 'readonly',
+    SetPlayerModel: 'readonly',
     SetTextDropshadow: 'readonly',
     SetTextDropShadow: 'readonly',
     SetTextEdge: 'readonly',
@@ -161,7 +171,9 @@ module.exports = {
     module: 'readonly'
   },
   rules: {
-    // Detect wrong framework methods
+    // Detect wrong framework methods and module access patterns
+    // IMPORTANT: Modules should be accessed via this.framework.getModule('module-name')
+    // NOT via this.framework.moduleName
     'no-restricted-syntax': [
       'error',
       {
@@ -179,6 +191,22 @@ module.exports = {
       {
         selector: 'MemberExpression[object.property.name="framework"][property.name="emitHook"]',
         message: '❌ this.framework.emitHook does not exist. Use: this.framework.runHook'
+      },
+      {
+        selector: 'MemberExpression[object.property.name="framework"][property.name="playerManager"]',
+        message: '❌ this.framework.playerManager does not exist. Use: this.framework.getModule(\'player-manager\')'
+      },
+      {
+        selector: 'MemberExpression[object.property.name="framework"][property.name="entityManager"]',
+        message: '❌ this.framework.entityManager does not exist. Use: this.framework.getModule(\'entity-manager\')'
+      },
+      {
+        selector: 'MemberExpression[object.property.name="framework"][property.name="database"]',
+        message: '❌ this.framework.database does not exist. Use: this.framework.getModule(\'database\')'
+      },
+      {
+        selector: 'MemberExpression[object.property.name="framework"][property.name=/.*Manager$/]',
+        message: '❌ Modules should be accessed via this.framework.getModule(\'module-name\'), not this.framework.moduleManager'
       }
     ],
     'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],

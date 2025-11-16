@@ -36,6 +36,7 @@ const Config = {
     // Note: item-registry is shared-only (no server.js)
     { name: 'container-manager', priority: 14 }, // Inventory system
     { name: 'character-manager', priority: 14 }, // Character management
+    { name: 'character-appearance', priority: 14 }, // Character appearance & skins
     { name: 'money-manager', priority: 15 },    // Money & economy
     { name: 'organization-manager', priority: 16 }, // Organizations/jobs
     { name: 'vehicle-manager', priority: 17 },  // Vehicle management
@@ -55,6 +56,7 @@ const Config = {
     { name: 'zone-manager', priority: 12 },     // Zone management system (client)
     { name: 'target', priority: 13 },           // Target system (client)
     { name: 'spawn-manager', priority: 15 },    // Spawn management (client)
+    { name: 'character-appearance', priority: 15 }, // Character appearance (client)
     { name: 'notifications', priority: 15 },    // Notification system
     { name: 'performance', priority: 20 }       // Performance monitoring
   ],

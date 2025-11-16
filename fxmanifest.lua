@@ -44,6 +44,7 @@ server_scripts {
   'src/modules/target/server.js',
   'src/modules/container-manager/server.js',
   'src/modules/character-manager/server.js',
+  'src/modules/character-appearance/server.js',
   'src/modules/money-manager/server.js',
   'src/modules/organization-manager/server.js',
   'src/modules/vehicle-manager/server.js',
@@ -66,6 +67,7 @@ client_scripts {
   'src/modules/zone-manager/client.js',
   'src/modules/target/client.js',
   'src/modules/spawn-manager/client.js',
+  'src/modules/character-appearance/client.js',
   'src/modules/notifications/client.js',
   'src/modules/performance/client.js',
   'src/core/client/main.js'

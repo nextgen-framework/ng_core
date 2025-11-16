@@ -41,9 +41,11 @@ class PlayerManager {
 
     // Player joined
     on('playerJoining', async () => {
-      await this.create(source);
-      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, source);
-      await this.framework.runHook(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, source);
+      // Capture source before async operations to avoid scope issues
+      const playerSource = source;
+      await this.create(playerSource);
+      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, playerSource);
+      await this.framework.runHook(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, playerSource);
     });
 
     // Player dropped
