@@ -126,5 +126,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = ResourceMonitor;
 }
 
-// Make available globally for client-side
-global.ClientModule_resource_monitor = ResourceMonitor;
+// Export to global scope for framework (FiveM client environment)
+global.NgModule_resource_monitor = ResourceMonitor;

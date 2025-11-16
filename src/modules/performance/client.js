@@ -154,5 +154,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = PerformanceModule;
 }
 
-// Make available globally for client-side
-global.ClientModule_performance = PerformanceModule;
+// Export to global scope for framework (FiveM client environment)
+global.NgModule_performance = PerformanceModule;

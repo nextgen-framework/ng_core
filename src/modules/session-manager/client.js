@@ -223,5 +223,5 @@ class SessionManagerClient {
   }
 }
 
-// Export for framework
-module.exports = SessionManagerClient;
+// Export to global scope for framework (FiveM client environment)
+if (typeof global !== "undefined") { global.NgModule_session_manager = SessionManagerClient; }

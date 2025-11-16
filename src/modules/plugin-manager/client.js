@@ -292,5 +292,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = PluginManager;
 }
 
-// Make available globally for client-side
-global.ClientModule_plugin_manager = PluginManager;
+// Export to global scope for framework (FiveM client environment)
+global.NgModule_plugin_manager = PluginManager;

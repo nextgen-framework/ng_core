@@ -441,5 +441,5 @@ class TargetManager {
   }
 }
 
-// Export for framework
-module.exports = TargetManager;
+// Export to global scope for framework (FiveM client environment)
+if (typeof global !== "undefined") { global.NgModule_target = TargetManager; }

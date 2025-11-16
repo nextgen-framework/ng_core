@@ -65,18 +65,16 @@ class NextGenFramework {
 
     this.utils.Log(`Loading ${modulesToLoad.length} modules (sorted by priority)...`, 'info');
 
-    const path = require('path');
-    const resourcePath = GetResourcePath(GetCurrentResourceName());
-
     for (const module of modulesToLoad) {
       const moduleName = module.name;
       try {
-        // Load module class using require() (same as server-side)
-        const modulePath = path.join(resourcePath, 'src/modules', moduleName, 'client.js');
-        const ModuleClass = require(modulePath);
+        // Module classes are loaded by fxmanifest.lua and registered in global scope
+        // Format: global.NgModule_<module_name>
+        const globalName = `NgModule_${moduleName.replace(/-/g, '_')}`;
+        const ModuleClass = global[globalName];
 
         if (!ModuleClass) {
-          throw new Error(`Module class not exported`);
+          throw new Error(`Module not found: ${globalName} (check fxmanifest.lua)`);
         }
 
         // Instantiate and initialize module

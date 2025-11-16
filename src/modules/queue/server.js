@@ -147,7 +147,7 @@ class Queue {
 
     // Allow external resources to implement custom queue logic
     // This hook can be used to dynamically assign queue types based on custom logic
-    const hookResult = await this.framework.executeHook('QUEUE_CALCULATE_PRIORITY', {
+    const hookResult = await this.framework.runHook('QUEUE_CALCULATE_PRIORITY', {
       source,
       identifiers,
       priority,

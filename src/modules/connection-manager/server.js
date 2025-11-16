@@ -158,7 +158,7 @@ class ConnectionManager {
 
       // Execute PLAYER_SPAWNED hook (after spawn)
       setImmediate(async () => {
-        await this.framework.executeHook(
+        await this.framework.runHook(
           this.framework.constants.Hooks.PLAYER_SPAWNED,
           { source, identifiers, playerData: this.playerData.get(source) }
         );
@@ -181,7 +181,7 @@ class ConnectionManager {
     try {
       this.setPlayerStage(source, stage, data);
 
-      const hookResult = await this.framework.executeHook(hookName, data);
+      const hookResult = await this.framework.runHook(hookName, data);
 
       // Check if any hook rejected the connection
       if (hookResult === false) {

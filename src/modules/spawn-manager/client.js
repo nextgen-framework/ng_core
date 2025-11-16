@@ -105,5 +105,5 @@ class SpawnManagerClient {
   }
 }
 
-// Export for framework
-module.exports = SpawnManagerClient;
+// Export to global scope for framework (FiveM client environment)
+if (typeof global !== "undefined") { global.NgModule_spawn_manager = SpawnManagerClient; }

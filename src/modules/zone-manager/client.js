@@ -459,9 +459,7 @@ class ZoneManagerClientModule {
   }
 }
 
-// Export for FiveM client (global scope)
+// Export to global scope for framework (FiveM client environment)
 if (typeof global !== 'undefined') {
-  global.ZoneManagerClientModule = ZoneManagerClientModule;
-  // Framework expects ClientModule_<module-name> format
-  global.ClientModule_zone_manager = ZoneManagerClientModule;
+  global.NgModule_zone_manager = ZoneManagerClientModule;
 }

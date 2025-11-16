@@ -160,5 +160,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = RPCModule;
 }
 
-// Make available globally for client-side
-global.ClientModule_rpc = RPCModule;
+// Export to global scope for framework (FiveM client environment)
+global.NgModule_rpc = RPCModule;

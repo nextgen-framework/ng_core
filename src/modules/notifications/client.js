@@ -194,5 +194,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = NotificationModule;
 }
 
-// Make available globally for client-side
-global.ClientModule_notifications = NotificationModule;
+// Export to global scope for framework (FiveM client environment)
+global.NgModule_notifications = NotificationModule;
