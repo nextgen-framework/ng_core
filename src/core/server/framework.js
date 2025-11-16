@@ -28,7 +28,7 @@ class NextGenFramework {
   setupNativeEventListeners() {
     // Consolidated playerDropped listener
     on('playerDropped', (reason) => {
-      const source = global.source;
+      // Note: 'source' is a magic global variable in FiveM event handlers
       const handlers = this.nativeHandlers.get('playerDropped') || [];
       handlers.forEach(handler => {
         try {

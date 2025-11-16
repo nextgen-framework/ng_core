@@ -25,7 +25,7 @@ class RPCModule {
   registerEventHandlers() {
     // Handle RPC requests from clients
     onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
-      const source = global.source;
+      // Note: 'source' is a magic global variable in FiveM event handlers
 
       try {
         const handler = this.handlers.get(rpcName);
