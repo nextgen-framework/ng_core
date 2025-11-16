@@ -155,6 +155,4 @@ class InstanceManagerClient {
 }
 
 // Export for framework
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = InstanceManagerClient;
-}
+module.exports = InstanceManagerClient;

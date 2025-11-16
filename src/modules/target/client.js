@@ -442,6 +442,4 @@ class TargetManager {
 }
 
 // Export for framework
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = TargetManager;
-}
+module.exports = TargetManager;

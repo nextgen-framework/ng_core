@@ -94,6 +94,4 @@ class SyncManagerClient {
 }
 
 // Export for framework
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SyncManagerClient;
-}
+module.exports = SyncManagerClient;

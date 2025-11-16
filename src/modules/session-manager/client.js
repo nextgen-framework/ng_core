@@ -224,6 +224,4 @@ class SessionManagerClient {
 }
 
 // Export for framework
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SessionManagerClient;
-}
+module.exports = SessionManagerClient;
