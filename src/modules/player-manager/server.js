@@ -83,6 +83,11 @@ class PlayerManager {
    * @param {number} source
    */
   async remove(source) {
+    // Ignore invalid sources (can happen if player drops during connection)
+    if (!source || source === null || source === undefined) {
+      return;
+    }
+
     const player = this.players.get(source);
     if (!player) {
       global.NextGenUtils.Log(`Player ${source} not found in pool`, 'warn');
@@ -103,6 +108,20 @@ class PlayerManager {
    */
   get(source) {
     return this.players.get(source);
+  }
+
+  /**
+   * Get a player by license identifier
+   * @param {string} license
+   * @returns {*}
+   */
+  getByLicense(license) {
+    for (const player of this.players.values()) {
+      if (player.identifiers && player.identifiers.license === license) {
+        return player;
+      }
+    }
+    return null;
   }
 
   /**

@@ -58,6 +58,7 @@ server_scripts {
 client_scripts {
   'src/core/client/event-bus.js',
   'src/core/client/framework.js',
+  'src/modules/connection-manager/client.js',
   'src/modules/resource-monitor/client.js',
   'src/modules/plugin-manager/client.js',
   'src/modules/rpc/client.js',

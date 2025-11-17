@@ -52,6 +52,17 @@ class ConnectionManager {
   }
 
   /**
+   * Update loading screen progress for a player
+   */
+  updateLoadingProgress(source, progress, stage, message) {
+    try {
+      emitNet('ng:loading:updateProgress', source, progress, stage, message);
+    } catch (error) {
+      // Silently fail if player disconnected
+    }
+  }
+
+  /**
    * Check if player is still connected
    */
   isPlayerConnected(source) {
@@ -76,6 +87,9 @@ class ConnectionManager {
         deferrals,
         startedAt: Date.now()
       });
+
+      // Update loading screen (FiveM loading is 0-20%, framework stages are 20-100%)
+      this.updateLoadingProgress(source, 20, 'loading', 'Loading player data...');
 
       // Check if player still connected
       if (!this.isPlayerConnected(source)) {
@@ -144,9 +158,39 @@ class ConnectionManager {
    * Continue connection process after player has joined
    * Handles post-connection stages: WAITING_CLIENT, CHECKING, READY, SPAWNED
    */
-  async continueConnectionProcess(source, identifiers, playerData) {
+  async continueConnectionProcess(oldSource, identifiers, playerData) {
     try {
-      console.log(`[NextGen] [Connection] Continuing connection process for ${source}...`);
+      // Get the startedAt timestamp from oldSource before it's deleted
+      const oldStageInfo = this.playerStages.get(oldSource);
+      const startedAt = oldStageInfo?.startedAt || Date.now();
+
+      // Wait for player to be created in player-manager (playerJoining event creates it)
+      const playerManager = this.framework.getModule('player-manager');
+      let player = null;
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max
+
+      while (!player && attempts < maxAttempts) {
+        player = playerManager?.getByLicense(identifiers.license);
+        if (!player) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      if (!player) {
+        console.log(`[NextGen] [Connection] Could not find player with license ${identifiers.license} after ${attempts * 100}ms`);
+        return false;
+      }
+
+      const source = player.source;
+      console.log(`[NextGen] [Connection] Continuing connection process for ${source} (was ${oldSource}, found after ${attempts * 100}ms)...`);
+
+      // Transfer startedAt to new source
+      this.setPlayerStage(source, this.framework.constants.PlayerStage.CONNECTING, { startedAt });
+
+      // Update loading screen - waiting for client (20-50%)
+      this.updateLoadingProgress(source, 50, 'waiting_client', 'Initializing client...');
 
       // Wait for client to signal it's ready (appearance applied)
       const clientReadyResult = await this.waitForClientReady(source, identifiers);
@@ -158,6 +202,9 @@ class ConnectionManager {
         DropPlayer(source, clientReadyResult.reason || 'Client initialization failed');
         return false;
       }
+
+      // Update loading screen - checking permissions (50-70%)
+      this.updateLoadingProgress(source, 70, 'checking', 'Checking permissions...');
 
       // Execute PLAYER_CHECK_PERMISSIONS hook
       const permissionResult = await this.executeStage(
@@ -181,6 +228,9 @@ class ConnectionManager {
         this.playerData.delete(source);
         return false;
       }
+
+      // Update loading screen - preparing spawn (70-90%)
+      this.updateLoadingProgress(source, 90, 'ready', 'Preparing spawn...');
 
       // Execute PLAYER_READY_TO_SPAWN hook
       const readyResult = await this.executeStage(
@@ -207,6 +257,7 @@ class ConnectionManager {
 
       // Mark as spawned
       this.setPlayerStage(source, this.framework.constants.PlayerStage.SPAWNED);
+      this.updateLoadingProgress(source, 100, 'spawned', 'Welcome!');
 
       const stageInfo = this.playerStages.get(source);
       const totalTime = Date.now() - stageInfo.startedAt;

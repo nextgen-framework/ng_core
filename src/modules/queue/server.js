@@ -326,6 +326,14 @@ class Queue {
       `\nPlease wait...`;
 
     entry.deferrals.update(message);
+
+    // Update loading screen with queue status
+    const queueMessage = `Position ${position}/${this.queue.length}${waitTime > 0 ? ` - ~${waitTime} min` : ''}`;
+    try {
+      emitNet('ng:loading:updateProgress', entry.source, 0, 'queue', queueMessage);
+    } catch (error) {
+      // Silently fail if player disconnected
+    }
   }
 
   /**
