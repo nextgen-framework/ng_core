@@ -27,7 +27,8 @@ class Queue {
       maxPlayers: GetConvarInt('sv_maxclients', 32),
       reservedSlots: 2, // Reserved for high priority
       connectTimeout: 120000, // 2 minutes
-      updateInterval: 5000 // 5 seconds
+      updateInterval: 1000, // 1 second - for animated queue cards
+      forceQueue: GetConvar('ngcore_queue_force', 'false') === 'true' // Force everyone into queue for testing
     };
 
     // Position update timer
@@ -64,7 +65,8 @@ class Queue {
       this.processQueue();
     });
 
-    this.log(`Queue module initialized (max: ${this.config.maxPlayers}, reserved: ${this.config.reservedSlots})`, 'info');
+    const forceQueueMsg = this.config.forceQueue ? ' [FORCE QUEUE MODE - TESTING]' : '';
+    this.log(`Queue module initialized (max: ${this.config.maxPlayers}, reserved: ${this.config.reservedSlots})${forceQueueMsg}`, 'info');
   }
 
   /**
@@ -168,7 +170,8 @@ class Queue {
     const typeConfig = queueType ? this.typeConfigs.get(queueType) : null;
     const hasReservedSlot = typeConfig && typeConfig.reservedSlots > 0 && playerCount >= (this.config.maxPlayers - typeConfig.reservedSlots);
 
-    if (!isServerFull && !hasReservedSlot) {
+    // Force queue mode - always put in queue for testing
+    if (!this.config.forceQueue && !isServerFull && !hasReservedSlot) {
       // Server has space, allow connection through stages
       this.connecting.add(source);
 
@@ -255,10 +258,13 @@ class Queue {
     const playerCount = GetNumPlayerIndices();
     const availableSlots = this.config.maxPlayers - playerCount;
 
-    if (availableSlots <= 0) return;
+    // In force queue mode, ignore slot availability (always process queue)
+    if (!this.config.forceQueue && availableSlots <= 0) return;
 
     // Let next player(s) connect
-    for (let i = 0; i < Math.min(availableSlots, this.queue.length); i++) {
+    const slotsToFill = this.config.forceQueue ? this.queue.length : Math.min(availableSlots, this.queue.length);
+
+    for (let i = 0; i < slotsToFill; i++) {
       const entry = this.queue[i];
 
       // Check timeout
@@ -267,6 +273,14 @@ class Queue {
         entry.deferrals.done('Connection timeout');
         this.log(`Player ${entry.identifiers.license} timed out in queue`, 'warn');
         continue;
+      }
+
+      // In force queue mode, require minimum 10 seconds in queue for testing
+      const minQueueTime = this.config.forceQueue ? 10000 : 0; // 10 seconds in force mode
+      const timeInQueue = Date.now() - entry.joinedAt;
+
+      if (timeInQueue < minQueueTime) {
+        continue; // Skip this player, they haven't been in queue long enough for testing
       }
 
       // Allow connection through stages
@@ -308,29 +322,30 @@ class Queue {
       position = this.getQueuePosition(entry.source);
     }
 
-    const waitTime = Math.ceil((position * 30) / 60); // Estimated wait in minutes
-    const priorityText = entry.priority < 100 ? ' (Priority)' : '';
-
-    let message = `\n🎮 NextGen Server\n\n`;
-
-    // Show queue type if one is assigned
+    // Get queue type display name
+    let queueTypeDisplay = 'Default';
     if (entry.queueType) {
       const typeConfig = this.typeConfigs.get(entry.queueType);
-      const queueTypeDisplay = typeConfig ? typeConfig.displayName : entry.queueType.toUpperCase();
-      message += `Queue Type: ${queueTypeDisplay}\n`;
+      queueTypeDisplay = typeConfig ? typeConfig.displayName : entry.queueType;
     }
 
-    message += `Queue Position: ${position}/${this.queue.length}${priorityText}\n` +
-      `Estimated Wait: ~${waitTime} min\n\n` +
-      `Server: ${GetNumPlayerIndices()}/${this.config.maxPlayers} players\n` +
-      `\nPlease wait...`;
-
-    entry.deferrals.update(message);
+    // Emit event for ng_queue to handle card presentation
+    emit('ng:queue:updatePosition', {
+      source: entry.source,
+      deferrals: entry.deferrals,
+      position: position,
+      total: this.queue.length,
+      playerCount: GetNumPlayerIndices(),
+      maxPlayers: this.config.maxPlayers,
+      queueType: queueTypeDisplay,
+      priority: entry.priority,
+      joinedAt: entry.joinedAt // Add timestamp for elapsed time calculation
+    });
 
     // Update loading screen with queue status
-    const queueMessage = `Position ${position}/${this.queue.length}${waitTime > 0 ? ` - ~${waitTime} min` : ''}`;
+    const queueMessage = `Position ${position}/${this.queue.length}`;
     try {
-      emitNet('ng:loading:updateProgress', entry.source, 0, 'queue', queueMessage);
+      emitNet('ng:loading:updateStageProgress', entry.source, 0, 'queue', queueMessage);
     } catch (error) {
       // Silently fail if player disconnected
     }
