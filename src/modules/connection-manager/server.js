@@ -8,9 +8,10 @@ class ConnectionManager {
     this.framework = framework;
     this.logger = null;
 
-    // Track player connection stages
-    this.playerStages = new Map(); // source -> stage info
-    this.playerData = new Map();   // source -> player data cache
+    // Track player connection stages by LICENSE (not source which changes)
+    this.playerStages = new Map(); // license -> { source, stage, ...stage data }
+    this.playerData = new Map();   // license -> player data cache
+    this.stuckClientMonitorInterval = null; // Store interval for cleanup
   }
 
   /**
@@ -48,15 +49,77 @@ class ConnectionManager {
       }
     });
 
+    // Start stuck client detection monitor
+    this.startStuckClientMonitor();
+
     this.log('Connection Manager initialized', 'info');
   }
 
   /**
-   * Update loading screen progress for a player
+   * Start intelligent stuck client monitor
+   * Monitors connection progress and forces disconnect if clients are stuck
    */
-  updateLoadingProgress(source, progress, stage, message) {
+  startStuckClientMonitor() {
+    // Stage timeout limits (in milliseconds)
+    const STAGE_TIMEOUTS = {
+      [this.framework.constants.PlayerStage.CONNECTING]: 45000,    // 45 seconds
+      [this.framework.constants.PlayerStage.LOADING]: 45000,       // 45 seconds
+      [this.framework.constants.PlayerStage.WAITING_CLIENT]: 35000, // 35 seconds
+      [this.framework.constants.PlayerStage.CHECKING]: 30000,      // 30 seconds
+      [this.framework.constants.PlayerStage.READY]: 30000,         // 30 seconds
+      [this.framework.constants.PlayerStage.SPAWNED]: Infinity     // Final stage, no timeout
+    };
+
+    // Monitor every 10 seconds
+    this.stuckClientMonitorInterval = setInterval(() => {
+      const now = Date.now();
+
+      for (const [license, stageInfo] of this.playerStages.entries()) {
+        const stage = stageInfo.stage;
+        const stageStartTime = stageInfo.updatedAt || stageInfo.startedAt;
+        const timeInStage = now - stageStartTime;
+        const timeout = STAGE_TIMEOUTS[stage] || 60000; // Default 60s
+
+        // Skip if stage has no timeout (SPAWNED)
+        if (timeout === Infinity) continue;
+
+        // Check if stuck in this stage for too long
+        if (timeInStage > timeout) {
+          const currentSource = this.getCurrentSource(license);
+          const playerName = stageInfo.playerName || 'Unknown';
+
+          console.log(`[NextGen] [Connection] STUCK CLIENT DETECTED: ${playerName} (${license}) stuck in stage '${stage}' for ${Math.round(timeInStage / 1000)}s`);
+
+          // Force disconnect
+          if (currentSource && this.isPlayerConnected(currentSource)) {
+            console.log(`[NextGen] [Connection] Force disconnecting stuck client ${license} (source ${currentSource})`);
+            DropPlayer(currentSource, 'Connection timeout - stuck in loading process');
+          }
+
+          // Cleanup
+          this.playerStages.delete(license);
+          this.playerData.delete(license);
+          this.clientReadyResolvers.delete(license);
+        }
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  /**
+   * Get current source for a license
+   */
+  getCurrentSource(license) {
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.getByLicense(license);
+    return player?.source || null;
+  }
+
+  /**
+   * Update stage progress for a player
+   */
+  updateStageProgress(source, progress, stage, message) {
     try {
-      emitNet('ng:loading:updateProgress', source, progress, stage, message);
+      emitNet('ng:loading:updateStageProgress', source, progress, stage, message);
     } catch (error) {
       // Silently fail if player disconnected
     }
@@ -78,60 +141,67 @@ class ConnectionManager {
   /**
    * Start player connection process
    * Called after queue allows connection
+   * NOW USES LICENSE AS PRIMARY IDENTIFIER
    */
   async startConnectionProcess(source, deferrals, identifiers) {
     try {
-      // Set initial stage
-      this.setPlayerStage(source, this.framework.constants.PlayerStage.CONNECTING, {
+      const license = identifiers.license;
+      const playerName = this.getPlayerName(source);
+
+      // Set initial stage using license
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CONNECTING, {
+        source,
         identifiers,
         deferrals,
+        playerName,
         startedAt: Date.now()
       });
 
       // Update loading screen (FiveM loading is 0-20%, framework stages are 20-100%)
-      this.updateLoadingProgress(source, 20, 'loading', 'Loading player data...');
+      this.updateStageProgress(source, 20, 'loading', 'Loading player data...');
 
       // Check if player still connected
       if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected before loading stage`);
-        this.playerStages.delete(source);
+        console.log(`[NextGen] [Connection] Player ${license} disconnected before loading stage`);
+        this.playerStages.delete(license);
         return false;
       }
 
       deferrals.update('Loading player data...');
 
       // Execute PLAYER_LOADING hook
-      const loadingResult = await this.executeStage(
-        source,
-        this.framework.constants.PlayerStage.LOADING,
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.LOADING);
+      const loadingResult = await this.framework.runHook(
         this.framework.constants.Hooks.PLAYER_LOADING,
         { source, identifiers }
       );
 
-      if (!loadingResult.success) {
-        deferrals.done(loadingResult.reason || 'Failed to load player data');
-        this.playerStages.delete(source);
+      // Check for hook rejection
+      if (loadingResult === false || (loadingResult && loadingResult.success === false)) {
+        const reason = loadingResult?.reason || loadingResult?.error || 'Failed to load player data';
+        deferrals.done(reason);
+        this.playerStages.delete(license);
         return false;
       }
 
       // Check if player still connected after loading
       if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected during loading stage`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
+        console.log(`[NextGen] [Connection] Player ${license} disconnected during loading stage`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
         return false;
       }
 
       // Store any data returned by loading hooks
-      if (loadingResult.data) {
-        this.playerData.set(source, loadingResult.data);
+      if (loadingResult && typeof loadingResult === 'object') {
+        this.playerData.set(license, loadingResult);
       }
 
       // Check if player still connected before permissions
       if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected before permission check`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
+        console.log(`[NextGen] [Connection] Player ${license} disconnected before permission check`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
         return false;
       }
 
@@ -141,15 +211,18 @@ class ConnectionManager {
 
       // Start post-connection stages asynchronously (after playerJoining)
       setImmediate(async () => {
-        await this.continueConnectionProcess(source, identifiers, loadingResult.data);
+        await this.continueConnectionProcess(source, identifiers, this.playerData.get(license));
       });
 
       return true;
     } catch (error) {
-      this.log(`Connection process failed for source ${source}: ${error.message}`, 'error');
+      const license = identifiers?.license;
+      this.log(`Connection process failed for ${license || source}: ${error.message}`, 'error');
       deferrals.done(`Connection failed: ${error.message}`);
-      this.playerStages.delete(source);
-      this.playerData.delete(source);
+      if (license) {
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
+      }
       return false;
     }
   }
@@ -157,12 +230,16 @@ class ConnectionManager {
   /**
    * Continue connection process after player has joined
    * Handles post-connection stages: WAITING_CLIENT, CHECKING, READY, SPAWNED
+   * NOW USES LICENSE AS PRIMARY IDENTIFIER
    */
   async continueConnectionProcess(oldSource, identifiers, playerData) {
     try {
-      // Get the startedAt timestamp from oldSource before it's deleted
-      const oldStageInfo = this.playerStages.get(oldSource);
+      const license = identifiers.license;
+
+      // Get the startedAt timestamp from existing stage info
+      const oldStageInfo = this.playerStages.get(license) || this.playerStages.get(oldSource);
       const startedAt = oldStageInfo?.startedAt || Date.now();
+      const playerName = oldStageInfo?.playerName || 'Unknown';
 
       // Wait for player to be created in player-manager (playerJoining event creates it)
       const playerManager = this.framework.getModule('player-manager');
@@ -171,7 +248,7 @@ class ConnectionManager {
       const maxAttempts = 50; // 5 seconds max
 
       while (!player && attempts < maxAttempts) {
-        player = playerManager?.getByLicense(identifiers.license);
+        player = playerManager?.getByLicense(license);
         if (!player) {
           await new Promise(resolve => setTimeout(resolve, 100));
           attempts++;
@@ -179,102 +256,136 @@ class ConnectionManager {
       }
 
       if (!player) {
-        console.log(`[NextGen] [Connection] Could not find player with license ${identifiers.license} after ${attempts * 100}ms`);
+        console.log(`[NextGen] [Connection] Could not find player with license ${license} after ${attempts * 100}ms`);
         return false;
       }
 
-      const source = player.source;
-      console.log(`[NextGen] [Connection] Continuing connection process for ${source} (was ${oldSource}, found after ${attempts * 100}ms)...`);
+      let currentSource = player.source;
 
-      // Transfer startedAt to new source
-      this.setPlayerStage(source, this.framework.constants.PlayerStage.CONNECTING, { startedAt });
+      // Get player name from player object or source
+      const actualPlayerName = player.getName ? player.getName() : this.getPlayerName(currentSource);
+      console.log(`[NextGen] [Connection] Continuing connection process for ${license} (${actualPlayerName}, source ${currentSource}, was ${oldSource}, found after ${attempts * 100}ms)...`);
+
+      // Clean up old source-based tracking if exists
+      if (this.playerStages.has(oldSource)) {
+        this.playerStages.delete(oldSource);
+      }
+
+      // Set stage using license with actual player name
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CONNECTING, { startedAt, playerName: actualPlayerName });
 
       // Update loading screen - waiting for client (20-50%)
-      this.updateLoadingProgress(source, 50, 'waiting_client', 'Initializing client...');
+      currentSource = this.getCurrentSource(license) || currentSource;
+      this.updateStageProgress(currentSource, 50, 'waiting_client', 'Initializing client...');
 
       // Wait for client to signal it's ready (appearance applied)
-      const clientReadyResult = await this.waitForClientReady(source, identifiers);
+      const clientReadyResult = await this.waitForClientReady(currentSource, identifiers);
 
       if (!clientReadyResult.success) {
-        console.log(`[NextGen] [Connection] Client ${source} failed to become ready: ${clientReadyResult.reason}`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        DropPlayer(source, clientReadyResult.reason || 'Client initialization failed');
+        currentSource = this.getCurrentSource(license) || currentSource;
+        console.log(`[NextGen] [Connection] Client ${license} failed to become ready: ${clientReadyResult.reason}`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
+        if (currentSource) {
+          DropPlayer(currentSource, clientReadyResult.reason || 'Client initialization failed');
+        }
         return false;
       }
+
+      // Update current source after client ready (may have changed)
+      currentSource = this.getCurrentSource(license) || currentSource;
+      console.log(`[NextGen] [Connection] Client ready for ${license} (source ${currentSource})`);
 
       // Update loading screen - checking permissions (50-70%)
-      this.updateLoadingProgress(source, 70, 'checking', 'Checking permissions...');
+      this.updateStageProgress(currentSource, 70, 'checking', 'Checking permissions...');
 
       // Execute PLAYER_CHECK_PERMISSIONS hook
-      const permissionResult = await this.executeStage(
-        source,
-        this.framework.constants.PlayerStage.CHECKING,
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CHECKING);
+      const permissionResult = await this.framework.runHook(
         this.framework.constants.Hooks.PLAYER_CHECK_PERMISSIONS,
-        { source, identifiers, playerData }
+        { source: currentSource, identifiers, playerData }
       );
 
-      if (!permissionResult.success) {
-        console.log(`[NextGen] [Connection] Permission check failed for ${source}`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        DropPlayer(source, permissionResult.reason || 'Permission check failed');
+      // Check for hook rejection
+      if (permissionResult === false || (permissionResult && permissionResult.success === false)) {
+        currentSource = this.getCurrentSource(license) || currentSource;
+        const reason = permissionResult?.reason || permissionResult?.error || 'Permission check failed';
+        console.log(`[NextGen] [Connection] Permission check failed for ${license}: ${reason}`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
+        if (currentSource) {
+          DropPlayer(currentSource, reason);
+        }
         return false;
       }
 
-      if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected during permission check`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
+      // Update current source and check connection
+      currentSource = this.getCurrentSource(license);
+      if (!currentSource || !this.isPlayerConnected(currentSource)) {
+        console.log(`[NextGen] [Connection] Player ${license} disconnected during permission check`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
         return false;
       }
 
       // Update loading screen - preparing spawn (70-90%)
-      this.updateLoadingProgress(source, 90, 'ready', 'Preparing spawn...');
+      this.updateStageProgress(currentSource, 90, 'ready', 'Preparing spawn...');
 
       // Execute PLAYER_READY_TO_SPAWN hook
-      const readyResult = await this.executeStage(
-        source,
-        this.framework.constants.PlayerStage.READY,
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.READY);
+      const readyResult = await this.framework.runHook(
         this.framework.constants.Hooks.PLAYER_READY_TO_SPAWN,
-        { source, identifiers, playerData }
+        { source: currentSource, identifiers, playerData }
       );
 
-      if (!readyResult.success) {
-        console.log(`[NextGen] [Connection] Spawn preparation failed for ${source}`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
-        DropPlayer(source, readyResult.reason || 'Failed to prepare spawn');
+      // Check for hook rejection
+      if (readyResult === false || (readyResult && readyResult.success === false)) {
+        currentSource = this.getCurrentSource(license) || currentSource;
+        const reason = readyResult?.reason || readyResult?.error || 'Spawn preparation failed';
+        console.log(`[NextGen] [Connection] Spawn preparation failed for ${license}: ${reason}`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
+        if (currentSource) {
+          DropPlayer(currentSource, reason);
+        }
         return false;
       }
 
-      if (!this.isPlayerConnected(source)) {
-        console.log(`[NextGen] [Connection] Player ${source} disconnected before spawn`);
-        this.playerStages.delete(source);
-        this.playerData.delete(source);
+      // Update current source and check connection
+      currentSource = this.getCurrentSource(license);
+      if (!currentSource || !this.isPlayerConnected(currentSource)) {
+        console.log(`[NextGen] [Connection] Player ${license} disconnected before spawn`);
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
         return false;
       }
 
       // Mark as spawned
-      this.setPlayerStage(source, this.framework.constants.PlayerStage.SPAWNED);
-      this.updateLoadingProgress(source, 100, 'spawned', 'Welcome!');
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.SPAWNED);
+      this.updateStageProgress(currentSource, 100, 'spawned', 'Welcome!');
 
-      const stageInfo = this.playerStages.get(source);
+      const stageInfo = this.playerStages.get(license);
       const totalTime = Date.now() - stageInfo.startedAt;
-      console.log(`[NextGen] [Connection] Player ${identifiers.license} completed all stages in ${totalTime}ms`);
+      console.log(`[NextGen] [Connection] Player ${license} completed all stages in ${totalTime}ms`);
+
+      // Trigger spawn on client (ng_freemode will handle the actual spawn)
+      emitNet('ng_core:readyToSpawn', currentSource);
 
       // Execute PLAYER_SPAWNED hook
       await this.framework.runHook(
         this.framework.constants.Hooks.PLAYER_SPAWNED,
-        { source, identifiers, playerData: this.playerData.get(source) }
+        { source: currentSource, identifiers, playerData: this.playerData.get(license) }
       );
 
       return true;
     } catch (error) {
-      console.log(`[NextGen] [Connection] Post-connection process failed for ${source}: ${error.message}`);
-      this.playerStages.delete(source);
-      this.playerData.delete(source);
-      DropPlayer(source, `Connection failed: ${error.message}`);
+      console.log(`[NextGen] [Connection] Post-connection process failed for ${license}: ${error.message}`);
+      this.playerStages.delete(license);
+      this.playerData.delete(license);
+      const currentSource = this.getCurrentSource(license);
+      if (currentSource) {
+        DropPlayer(currentSource, `Connection failed: ${error.message}`);
+      }
       return false;
     }
   }
@@ -359,73 +470,140 @@ class ConnectionManager {
   }
 
   /**
-   * Set player stage
+   * Set player stage (by license)
    */
-  setPlayerStage(source, stage, data = {}) {
-    const existing = this.playerStages.get(source) || {};
-    const playerName = this.getPlayerName(source);
+  setPlayerStageByLicense(license, stage, data = {}) {
+    const existing = this.playerStages.get(license) || {};
+    const currentSource = this.getCurrentSource(license);
+    const playerName = data.playerName || existing.playerName || this.getPlayerName(currentSource);
 
-    this.playerStages.set(source, {
+    this.playerStages.set(license, {
       ...existing,
       ...data,
+      source: currentSource,
+      playerName,
       stage,
       updatedAt: Date.now()
     });
 
     // Log state changes with player name
-    console.log(`[NextGen] [Connection] Player ${playerName} (${source}) -> Stage: ${stage}`);
+    console.log(`[NextGen] [Connection] Player ${playerName} (${license}) -> Stage: ${stage}`);
+  }
+
+  /**
+   * Set player stage (legacy - redirects to license-based method)
+   */
+  setPlayerStage(source, stage, data = {}) {
+    // Get license from player-manager
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.get(source);
+    const license = player?.identifiers?.license || data.license;
+
+    if (license) {
+      this.setPlayerStageByLicense(license, stage, { ...data, source });
+    } else {
+      console.log(`[NextGen] [Connection] Warning: Could not get license for source ${source}`);
+    }
   }
 
   /**
    * Get player name safely
    */
   getPlayerName(source) {
+    if (!source) return 'Unknown';
     try {
-      return GetPlayerName(source) || `Unknown (${source})`;
+      return GetPlayerName(source) || 'Unknown';
     } catch (e) {
-      return `Unknown (${source})`;
+      return 'Unknown';
     }
   }
 
   /**
-   * Get player stage
+   * Get player stage (by license)
    */
-  getPlayerStage(source) {
-    const stageInfo = this.playerStages.get(source);
+  getPlayerStageByLicense(license) {
+    const stageInfo = this.playerStages.get(license);
     return stageInfo ? stageInfo.stage : null;
   }
 
   /**
-   * Get player data
+   * Get player stage (legacy)
+   */
+  getPlayerStage(source) {
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.get(source);
+    const license = player?.identifiers?.license;
+
+    if (license) {
+      return this.getPlayerStageByLicense(license);
+    }
+    return null;
+  }
+
+  /**
+   * Get player data (by license)
+   */
+  getPlayerDataByLicense(license) {
+    return this.playerData.get(license);
+  }
+
+  /**
+   * Get player data (legacy - by source)
    */
   getPlayerData(source) {
-    return this.playerData.get(source);
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.get(source);
+    const license = player?.identifiers?.license;
+
+    if (license) {
+      return this.getPlayerDataByLicense(license);
+    }
+    return null;
   }
 
   /**
    * Handle player dropped
    */
   handlePlayerDropped(source, reason) {
-    const stage = this.getPlayerStage(source);
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.get(source);
+    const license = player?.identifiers?.license;
 
-    if (stage) {
-      this.log(`Player ${source} dropped during stage: ${stage} (${reason})`, 'info');
-      this.setPlayerStage(source, this.framework.constants.PlayerStage.DISCONNECTED);
+    if (license) {
+      const stage = this.getPlayerStageByLicense(license);
+      if (stage) {
+        this.log(`Player ${license} (source ${source}) dropped during stage: ${stage} (${reason})`, 'info');
+        this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.DISCONNECTED);
+      }
+
+      // Clean up after a delay (in case resources need the data)
+      setTimeout(() => {
+        this.playerStages.delete(license);
+        this.playerData.delete(license);
+      }, 5000);
     }
-
-    // Clean up after a delay (in case resources need the data)
-    setTimeout(() => {
-      this.playerStages.delete(source);
-      this.playerData.delete(source);
-    }, 5000);
   }
 
   /**
-   * Check if player is ready
+   * Check if player is ready (by license)
+   */
+  isPlayerReadyByLicense(license) {
+    const stage = this.getPlayerStageByLicense(license);
+    return stage === this.framework.constants.PlayerStage.SPAWNED;
+  }
+
+  /**
+   * Check if player is ready (legacy)
    */
   isPlayerReady(source) {
-    const stage = this.getPlayerStage(source);
-    return stage === this.framework.constants.PlayerStage.SPAWNED;
+    const playerManager = this.framework.getModule('player-manager');
+    const player = playerManager?.get(source);
+    const license = player?.identifiers?.license;
+
+    if (license) {
+      return this.isPlayerReadyByLicense(license);
+    }
+    return false;
   }
 
   /**
@@ -433,9 +611,10 @@ class ConnectionManager {
    */
   getConnectionInfo() {
     const stages = {};
-    for (const [source, info] of this.playerStages.entries()) {
-      stages[source] = {
+    for (const [license, info] of this.playerStages.entries()) {
+      stages[license] = {
         stage: info.stage,
+        source: info.source,
         duration: Date.now() - info.startedAt
       };
     }
@@ -460,8 +639,15 @@ class ConnectionManager {
    * Cleanup
    */
   async destroy() {
+    // Clear monitor interval
+    if (this.stuckClientMonitorInterval) {
+      clearInterval(this.stuckClientMonitorInterval);
+      this.stuckClientMonitorInterval = null;
+    }
+
     this.playerStages.clear();
     this.playerData.clear();
+    this.clientReadyResolvers.clear();
     this.log('Connection Manager destroyed', 'info');
   }
 }

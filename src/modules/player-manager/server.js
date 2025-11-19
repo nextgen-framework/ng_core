@@ -32,7 +32,8 @@ class PlayerManager {
         // Run hooks
         await this.framework.runHook(this.framework.constants.Hooks.BEFORE_PLAYER_JOIN, source, deferrals);
 
-        deferrals.done();
+        // Queue/connection-manager handles deferrals - don't call done() here
+        // deferrals.done(); will be called by queue or connection-manager
       } catch (error) {
         this.framework.utils.Log(`Player connection error: ${error.message}`, 'error');
         deferrals.done(error.message);
