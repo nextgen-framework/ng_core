@@ -6,7 +6,7 @@
 class Queue {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.whitelist = null;
 
@@ -40,6 +40,7 @@ class Queue {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.whitelist = this.framework.getModule('whitelist');
     this.connectionManager = this.framework.getModule('connection-manager');
 
@@ -50,7 +51,7 @@ class Queue {
     await this.loadPriorities();
 
     // Register connecting hook
-    this.framework.registerHook(
+    this.framework.events.on(
       this.framework.constants.Hooks.BEFORE_PLAYER_JOIN,
       this.handleConnection.bind(this)
     );
@@ -134,10 +135,12 @@ class Queue {
 
   /**
    * Handle player connection attempt
+   * @param {Object} data - { source, deferrals }
    */
-  async handleConnection(source, deferrals) {
+  async handleConnection(data) {
+    const { source, deferrals } = data;
     if (!this.config.enabled) {
-      return; // Queue disabled
+      return data; // Queue disabled - pass through
     }
 
     const identifiers = this.getPlayerIdentifiers(source);
@@ -149,7 +152,7 @@ class Queue {
 
     // Allow external resources to implement custom queue logic
     // This hook can be used to dynamically assign queue types based on custom logic
-    const hookResult = await this.framework.runHook('QUEUE_CALCULATE_PRIORITY', {
+    const hookResult = await this.framework.events.pipe('QUEUE_CALCULATE_PRIORITY', {
       source,
       identifiers,
       priority,
@@ -330,7 +333,7 @@ class Queue {
     }
 
     // Emit event for ng_queue to handle card presentation
-    emit('ng:queue:updatePosition', {
+    this.framework.fivem.emit('ng:queue:updatePosition', {
       source: entry.source,
       deferrals: entry.deferrals,
       position: position,
@@ -345,7 +348,7 @@ class Queue {
     // Update loading screen with queue status
     const queueMessage = `Position ${position}/${this.queue.length}`;
     try {
-      emitNet('ng:loading:updateStageProgress', entry.source, 0, 'queue', queueMessage);
+      this.framework.fivem.emitNet('ng:loading:updateStageProgress', entry.source, 0, 'queue', queueMessage);
     } catch (error) {
       // Silently fail if player disconnected
     }
@@ -643,7 +646,7 @@ class Queue {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Queue] ${message}`, level);
+      this.framework.log[level](`[Queue] ${message}`);
     }
   }
 
@@ -663,3 +666,6 @@ class Queue {
 }
 
 module.exports = Queue;
+
+// Self-register
+global.Framework.register('queue', new Queue(global.Framework), 9);

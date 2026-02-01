@@ -6,7 +6,7 @@
 class AccessManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // In-memory access caches for fast lookups
@@ -36,6 +36,7 @@ class AccessManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
 
     // Load all access data from database
     await this.loadVehicleKeys();
@@ -248,7 +249,7 @@ class AccessManager {
       this.log(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`, 'debug');
 
       // Sync to all clients
-      emitNet('ng_core:door-state-changed', -1, doorId, newState);
+      this.framework.fivem.emitNet('ng_core:door-state-changed', -1, doorId, newState);
 
       return { success: true, locked: newState };
     } catch (error) {
@@ -617,7 +618,7 @@ class AccessManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Access Manager] ${message}`, level);
+      this.framework.log[level](`[Access Manager] ${message}`);
     }
   }
 
@@ -635,3 +636,6 @@ class AccessManager {
 }
 
 module.exports = AccessManager;
+
+// Self-register
+global.Framework.register('access-manager', new AccessManager(global.Framework), 11);

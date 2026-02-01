@@ -20,7 +20,7 @@ class NotificationModule {
    * Initialize the notification module
    */
   async init() {
-    this.framework.utils.Log('Notifications Module initialized', 'info');
+    this.framework.log.info('Notifications Module initialized');
 
     // Listen to EventBus notifications
     this.framework.eventBus.on('NOTIFICATION', (data) => {
@@ -28,18 +28,21 @@ class NotificationModule {
     });
 
     // Register RPC handler for server notifications
-    this.framework.rpc.register('notify', (message, type, duration) => {
-      this.notify(message, type, duration);
-      return true;
-    });
+    const rpc = this.framework.getModule('rpc');
+    if (rpc) {
+      rpc.register('notify', (message, type, duration) => {
+        this.notify(message, type, duration);
+        return true;
+      });
 
-    // Register RPC for advanced notifications
-    this.framework.rpc.register('notifyAdvanced', (title, message, type, duration) => {
-      this.advanced(title, message, type, duration);
-      return true;
-    });
+      // Register RPC for advanced notifications
+      rpc.register('notifyAdvanced', (title, message, type, duration) => {
+        this.advanced(title, message, type, duration);
+        return true;
+      });
+    }
 
-    this.framework.utils.Log('Notifications Module ready', 'info');
+    this.framework.log.info('Notifications Module ready');
   }
 
   /**
@@ -184,7 +187,7 @@ class NotificationModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.utils.Log('Notifications Module destroyed', 'info');
+    this.framework.log.info('Notifications Module destroyed');
     this.queue = [];
   }
 }
@@ -196,3 +199,6 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Export to global scope for framework (FiveM client environment)
 global.NgModule_notifications = NotificationModule;
+
+// Self-register
+global.Framework.register('notifications', new NotificationModule(global.Framework), 15);

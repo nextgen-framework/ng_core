@@ -9,6 +9,12 @@ class RPCModule {
     this.handlers = new Map();
     this.pendingCalls = new Map();
     this.callTimeout = 10000; // 10 seconds default timeout
+
+    // Pre-registered at script load time (cerulean)
+    this.netEvents = [
+      global.NextGenConstants?.Events?.RPC_REQUEST,
+      global.NextGenConstants?.Events?.RPC_RESPONSE
+    ].filter(Boolean);
   }
 
   /**
@@ -16,7 +22,7 @@ class RPCModule {
    */
   async init() {
     this.registerEventHandlers();
-    this.framework.utils.Log('RPC module initialized', 'info');
+    this.framework.log.info('RPC module initialized');
   }
 
   /**
@@ -24,7 +30,7 @@ class RPCModule {
    */
   registerEventHandlers() {
     // Handle RPC requests from server
-    onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
+    this.framework.onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
       try {
         const handler = this.handlers.get(rpcName);
         if (!handler) {
@@ -35,13 +41,13 @@ class RPCModule {
         const result = await handler(...args);
 
         // Send response back to server
-        emitNet(global.NextGenConstants.Events.RPC_RESPONSE, callId, {
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, callId, {
           success: true,
           data: result
         });
       } catch (error) {
         // Send error response
-        emitNet(global.NextGenConstants.Events.RPC_RESPONSE, callId, {
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, callId, {
           success: false,
           error: error.message
         });
@@ -51,7 +57,7 @@ class RPCModule {
     });
 
     // Handle RPC responses (for client -> server calls)
-    onNet(global.NextGenConstants.Events.RPC_RESPONSE, (callId, response) => {
+    this.framework.onNet(global.NextGenConstants.Events.RPC_RESPONSE, (callId, response) => {
       const pending = this.pendingCalls.get(callId);
       if (pending) {
         clearTimeout(pending.timeout);
@@ -109,7 +115,7 @@ class RPCModule {
       this.pendingCalls.set(callId, { resolve, reject, timeout });
 
       // Send RPC request to server
-      emitNet(global.NextGenConstants.Events.RPC_REQUEST, callId, rpcName, ...args);
+      this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_REQUEST, callId, rpcName, ...args);
     });
   }
 
@@ -142,7 +148,7 @@ class RPCModule {
    * Cleanup method
    */
   async destroy() {
-    this.framework.utils.Log('RPC module destroyed', 'info');
+    this.framework.log.info('RPC module destroyed');
 
     // Clear all pending calls
     for (const [callId, pending] of this.pendingCalls) {
@@ -162,3 +168,6 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Export to global scope for framework (FiveM client environment)
 global.NgModule_rpc = RPCModule;
+
+// Self-register
+global.Framework.register('rpc', new RPCModule(global.Framework), 5);

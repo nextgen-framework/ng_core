@@ -14,7 +14,7 @@ class EntityManager {
    * Initialize the entity manager module
    */
   async init() {
-    this.framework.utils.Log('Entity Manager module initialized', 'info');
+    this.framework.log.info('Entity Manager module initialized');
   }
 
   /**
@@ -326,3 +326,6 @@ class Entity {
 }
 
 module.exports = EntityManager;
+
+// Self-register
+global.Framework.register('entity-manager', new EntityManager(global.Framework), 10);

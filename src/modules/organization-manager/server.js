@@ -6,7 +6,7 @@
 class OrganizationManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.moneyManager = null;
     this.accessManager = null;
@@ -25,6 +25,7 @@ class OrganizationManager {
 
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.moneyManager = this.framework.getModule('money-manager');
     this.accessManager = this.framework.getModule('access-manager');
 
@@ -108,3 +109,6 @@ class OrganizationManager {
 }
 
 module.exports = OrganizationManager;
+
+// Self-register
+global.Framework.register('organization-manager', new OrganizationManager(global.Framework), 16);

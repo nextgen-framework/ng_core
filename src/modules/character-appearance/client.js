@@ -8,6 +8,9 @@ class CharacterAppearanceClient {
     this.framework = framework;
     this.currentAppearance = null;
     this.isApplying = false;
+
+    // Pre-registered at script load time (cerulean)
+    this.netEvents = ['ng_core:apply-appearance'];
   }
 
   /**
@@ -26,7 +29,7 @@ class CharacterAppearanceClient {
    */
   requestAppearance() {
     console.log('[Character Appearance] Requesting appearance from server...');
-    emitNet('ng_core:request-appearance');
+    this.framework.fivem.emitNet('ng_core:request-appearance');
   }
 
   /**
@@ -34,7 +37,7 @@ class CharacterAppearanceClient {
    */
   registerEvents() {
     // Apply appearance when received from server
-    onNet('ng_core:apply-appearance', async (appearance) => {
+    this.framework.onNet('ng_core:apply-appearance', async (appearance) => {
       console.log('[Character Appearance] Received appearance from server');
       this.currentAppearance = appearance;
 
@@ -68,7 +71,7 @@ class CharacterAppearanceClient {
 
       // Signal to server that client is ready (appearance applied)
       console.log('[Character Appearance] Signaling server that client is ready...');
-      emitNet('ng_core:client-ready');
+      this.framework.fivem.emitNet('ng_core:client-ready');
 
     } catch (error) {
       console.error('[Character Appearance] Error applying appearance:', error);
@@ -168,7 +171,7 @@ class CharacterAppearanceClient {
    */
   saveAppearance() {
     if (this.currentAppearance) {
-      emitNet('ng_core:save-appearance', this.currentAppearance);
+      this.framework.fivem.emitNet('ng_core:save-appearance', this.currentAppearance);
       console.log('[Character Appearance] Appearance saved');
     }
   }
@@ -192,3 +195,6 @@ class CharacterAppearanceClient {
 if (typeof global !== 'undefined') {
   global.NgModule_character_appearance = CharacterAppearanceClient;
 }
+
+// Self-register
+global.Framework.register('character-appearance', new CharacterAppearanceClient(global.Framework), 15);

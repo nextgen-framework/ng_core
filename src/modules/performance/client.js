@@ -17,14 +17,17 @@ class PerformanceModule {
    * Initialize the performance module
    */
   async init() {
-    this.framework.utils.Log('Performance Monitor Module initialized', 'info');
+    this.framework.log.info('Performance Monitor Module initialized');
 
     // Register RPC handlers
-    this.framework.rpc.register('getClientPerformance', () => {
+    const rpc = this.framework.getModule('rpc');
+    if (!rpc) return;
+
+    rpc.register('getClientPerformance', () => {
       return this.getPerformanceData();
     });
 
-    this.framework.rpc.register('togglePerformanceOverlay', (show) => {
+    rpc.register('togglePerformanceOverlay', (show) => {
       this.showOverlay = show !== undefined ? show : !this.showOverlay;
       return { showing: this.showOverlay };
     });
@@ -41,7 +44,7 @@ class PerformanceModule {
       }
     });
 
-    this.framework.utils.Log('Performance Monitor Module ready', 'info');
+    this.framework.log.info('Performance Monitor Module ready');
   }
 
   /**
@@ -144,7 +147,7 @@ class PerformanceModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.utils.Log('Performance Monitor Module destroyed', 'info');
+    this.framework.log.info('Performance Monitor Module destroyed');
     this.showOverlay = false;
   }
 }
@@ -156,3 +159,6 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Export to global scope for framework (FiveM client environment)
 global.NgModule_performance = PerformanceModule;
+
+// Self-register
+global.Framework.register('performance', new PerformanceModule(global.Framework), 20);

@@ -6,7 +6,7 @@
 class ContainerManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.itemRegistry = null;
 
@@ -38,6 +38,7 @@ class ContainerManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.itemRegistry = this.framework.getModule('item-registry');
 
     // Start auto-save
@@ -633,7 +634,7 @@ class ContainerManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Container Manager] ${message}`, level);
+      this.framework.log[level](`[Container Manager] ${message}`);
     }
   }
 
@@ -650,3 +651,6 @@ class ContainerManager {
 }
 
 module.exports = ContainerManager;
+
+// Self-register
+global.Framework.register('container-manager', new ContainerManager(global.Framework), 14);

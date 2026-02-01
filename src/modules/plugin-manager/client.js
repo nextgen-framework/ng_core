@@ -18,10 +18,10 @@ class PluginManager {
    * This triggers Phase 3: Plugin loading
    */
   async init() {
-    this.framework.utils.Log('Plugin Manager module initialized', 'info');
+    this.framework.log.info('Plugin Manager module initialized');
 
     // PHASE 3: Load plugins (external only on client)
-    this.framework.utils.Log('Phase 3: Loading Plugins...', 'info');
+    this.framework.log.info('Phase 3: Loading Plugins...');
 
     // Enable auto-detection for external resource-based plugins
     this.enableAutoDetection();
@@ -32,12 +32,12 @@ class PluginManager {
    */
   enableAutoDetection() {
     if (this.autoDetectionEnabled) {
-      this.framework.utils.Log('Plugin auto-detection is already enabled', 'warn');
+      this.framework.log.warn('Plugin auto-detection is already enabled');
       return;
     }
 
     this.autoDetectionEnabled = true;
-    this.framework.utils.Log('Enabling plugin auto-detection for external resources...', 'info');
+    this.framework.log.info('Enabling plugin auto-detection for external resources...');
 
     // Listen for resource start events (client-side)
     on('onResourceStart', async (resourceName) => {
@@ -68,14 +68,14 @@ class PluginManager {
       await this.scanExistingResources();
     });
 
-    this.framework.utils.Log('Plugin auto-detection enabled successfully', 'info');
+    this.framework.log.info('Plugin auto-detection enabled successfully');
   }
 
   /**
    * Scan already started resources for ng_core plugins
    */
   async scanExistingResources() {
-    this.framework.utils.Log('Scanning existing resources for ng_core plugins...', 'info');
+    this.framework.log.info('Scanning existing resources for ng_core plugins...');
 
     const numResources = GetNumResources();
     let detectedCount = 0;
@@ -100,7 +100,7 @@ class PluginManager {
     }
 
     if (detectedCount > 0) {
-      this.framework.utils.Log(`Found and loaded ${detectedCount} external plugins`, 'info');
+      this.framework.log.info(`Found and loaded ${detectedCount} external plugins`);
     }
   }
 
@@ -138,11 +138,11 @@ class PluginManager {
    */
   async loadExternalPlugin(resourceName, metadata, pluginInstance) {
     if (this.externalPlugins.has(resourceName)) {
-      this.framework.utils.Log(`External plugin "${resourceName}" is already loaded`, 'warn');
+      this.framework.log.warn(`External plugin "${resourceName}" is already loaded`);
       return;
     }
 
-    this.framework.utils.Log(`Loading external plugin: ${resourceName}`, 'info');
+    this.framework.log.info(`Loading external plugin: ${resourceName}`);
 
     // Initialize the plugin
     if (typeof pluginInstance.init === 'function') {
@@ -156,7 +156,7 @@ class PluginManager {
       resourceName
     });
 
-    this.framework.utils.Log(`External plugin loaded: ${metadata.name || resourceName}`, 'info');
+    this.framework.log.info(`External plugin loaded: ${metadata.name || resourceName}`);
 
     // Emit event
     this.framework.eventBus.emit('PLUGIN_LOADED', {
@@ -176,21 +176,21 @@ class PluginManager {
       return;
     }
 
-    this.framework.utils.Log(`Unloading external plugin: ${resourceName}`, 'info');
+    this.framework.log.info(`Unloading external plugin: ${resourceName}`);
 
     // Call destroy if available
     if (typeof plugin.instance.destroy === 'function') {
       try {
         await plugin.instance.destroy();
       } catch (error) {
-        this.framework.utils.Log(`Error during plugin destroy for "${resourceName}": ${error.message}`, 'error');
+        this.framework.log.error(`Error during plugin destroy for "${resourceName}": ${error.message}`);
       }
     }
 
     // Remove from registry
     this.externalPlugins.delete(resourceName);
 
-    this.framework.utils.Log(`External plugin unloaded: ${resourceName}`, 'info');
+    this.framework.log.info(`External plugin unloaded: ${resourceName}`);
 
     // Emit event
     this.framework.eventBus.emit('PLUGIN_UNLOADED', {
@@ -216,7 +216,7 @@ class PluginManager {
     this.plugins.set(pluginName, pluginInstance);
     this.pluginStates.set(pluginName, 'loaded');
 
-    this.framework.utils.Log(`Plugin registered: ${pluginName}`, 'info');
+    this.framework.log.info(`Plugin registered: ${pluginName}`);
   }
 
   /**
@@ -243,11 +243,11 @@ class PluginManager {
   async unload(pluginName) {
     const plugin = this.plugins.get(pluginName);
     if (!plugin) {
-      this.framework.utils.Log(`Plugin "${pluginName}" is not loaded`, 'warn');
+      this.framework.log.warn(`Plugin "${pluginName}" is not loaded`);
       return;
     }
 
-    this.framework.utils.Log(`Unloading plugin: ${pluginName}`, 'info');
+    this.framework.log.info(`Unloading plugin: ${pluginName}`);
 
     // Call destroy if available
     if (typeof plugin.destroy === 'function') {
@@ -258,7 +258,7 @@ class PluginManager {
     this.plugins.delete(pluginName);
     this.pluginStates.delete(pluginName);
 
-    this.framework.utils.Log(`Plugin unloaded: ${pluginName}`, 'info');
+    this.framework.log.info(`Plugin unloaded: ${pluginName}`);
   }
 
   /**
@@ -273,7 +273,7 @@ class PluginManager {
    * Cleanup method
    */
   async destroy() {
-    this.framework.utils.Log('Plugin Manager module destroyed', 'info');
+    this.framework.log.info('Plugin Manager module destroyed');
 
     // Unload all plugins
     for (const [pluginName] of this.plugins) {
@@ -294,3 +294,6 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Export to global scope for framework (FiveM client environment)
 global.NgModule_plugin_manager = PluginManager;
+
+// Self-register
+global.Framework.register('plugin-manager', new PluginManager(global.Framework), 1);

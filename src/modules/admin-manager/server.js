@@ -6,7 +6,7 @@
 class AdminManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // Admin permissions
@@ -20,6 +20,7 @@ class AdminManager {
 
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     await this.loadAdmins();
 
     // Register admin commands via chat-commands
@@ -119,7 +120,7 @@ class AdminManager {
     // Noclip command
     chatCommands.register('noclip', (source, args) => {
       if (!this.isAdmin(source)) return;
-      emitNet('ng_core:admin-noclip', source);
+      this.framework.fivem.emitNet('ng_core:admin-noclip', source);
     });
   }
 
@@ -135,3 +136,6 @@ class AdminManager {
 }
 
 module.exports = AdminManager;
+
+// Self-register
+global.Framework.register('admin-manager', new AdminManager(global.Framework), 11);

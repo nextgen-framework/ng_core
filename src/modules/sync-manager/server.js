@@ -230,7 +230,7 @@ class SyncManager {
       this.state.weather.transition = weatherType;
 
       // Sync transition to all clients
-      emitNet('ng_core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
+      this.framework.fivem.emitNet('ng_core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
 
       // Update current weather after transition
       setTimeout(() => {
@@ -241,7 +241,7 @@ class SyncManager {
       this.log(`Weather transitioning to ${weatherType}`, 'debug');
     } else {
       this.state.weather.current = weatherType;
-      emitNet('ng_core:weather-set', -1, weatherType);
+      this.framework.fivem.emitNet('ng_core:weather-set', -1, weatherType);
       this.log(`Weather set to ${weatherType}`, 'info');
     }
   }
@@ -281,7 +281,7 @@ class SyncManager {
    */
   setBlackout(enabled) {
     this.state.blackout = enabled;
-    emitNet('ng_core:blackout-set', -1, enabled);
+    this.framework.fivem.emitNet('ng_core:blackout-set', -1, enabled);
     this.log(`Blackout ${enabled ? 'enabled' : 'disabled'}`, 'info');
   }
 
@@ -301,7 +301,7 @@ class SyncManager {
    */
   setTrafficDensity(density) {
     this.state.trafficDensity = Math.max(0, Math.min(1, density));
-    emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
     this.log(`Traffic density set to ${this.state.trafficDensity}`, 'info');
   }
 
@@ -310,7 +310,7 @@ class SyncManager {
    */
   setPedestrianDensity(density) {
     this.state.pedestrianDensity = Math.max(0, Math.min(1, density));
-    emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
     this.log(`Pedestrian density set to ${this.state.pedestrianDensity}`, 'info');
   }
 
@@ -347,34 +347,34 @@ class SyncManager {
    */
   syncToAll() {
     this.syncTimeToAll(false);
-    emitNet('ng_core:weather-set', -1, this.state.weather.current);
-    emitNet('ng_core:blackout-set', -1, this.state.blackout);
-    emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
-    emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core:weather-set', -1, this.state.weather.current);
+    this.framework.fivem.emitNet('ng_core:blackout-set', -1, this.state.blackout);
+    this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
   }
 
   /**
    * Sync current state to specific player
    */
   syncToPlayer(source) {
-    emitNet('ng_core:time-set', source,
+    this.framework.fivem.emitNet('ng_core:time-set', source,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,
       this.state.time.frozen,
       false // No transition
     );
-    emitNet('ng_core:weather-set', source, this.state.weather.current);
-    emitNet('ng_core:blackout-set', source, this.state.blackout);
-    emitNet('ng_core:traffic-density-set', source, this.state.trafficDensity);
-    emitNet('ng_core:pedestrian-density-set', source, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core:weather-set', source, this.state.weather.current);
+    this.framework.fivem.emitNet('ng_core:blackout-set', source, this.state.blackout);
+    this.framework.fivem.emitNet('ng_core:traffic-density-set', source, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', source, this.state.pedestrianDensity);
   }
 
   /**
    * Sync time to all clients
    */
   syncTimeToAll(transition) {
-    emitNet('ng_core:time-set', -1,
+    this.framework.fivem.emitNet('ng_core:time-set', -1,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,
@@ -392,7 +392,7 @@ class SyncManager {
    */
   async loadState() {
     try {
-      const db = this.framework.database;
+      const db = this.framework.getModule('database');
       if (!db) return;
 
       const saved = await db.query('SELECT * FROM world_state WHERE id = 1');
@@ -416,7 +416,7 @@ class SyncManager {
    */
   async saveState() {
     try {
-      const db = this.framework.database;
+      const db = this.framework.getModule('database');
       if (!db) return;
 
       await db.execute(
@@ -488,7 +488,7 @@ class SyncManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Sync Manager] ${message}`, level);
+      this.framework.log[level](`[Sync Manager] ${message}`);
     }
   }
 
@@ -505,3 +505,6 @@ class SyncManager {
 }
 
 module.exports = SyncManager;
+
+// Self-register
+global.Framework.register('sync-manager', new SyncManager(global.Framework), 11);

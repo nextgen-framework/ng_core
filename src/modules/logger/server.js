@@ -53,7 +53,7 @@ class Logger {
    */
   async init() {
     // Get database module if available
-    this.db = this.framework.database;
+    this.db = this.framework.getModule('database');
 
     // Start buffer flush timer if database output enabled
     if (this.config.databaseOutput && this.db) {
@@ -330,3 +330,6 @@ class Logger {
 }
 
 module.exports = Logger;
+
+// Self-register
+global.Framework.register('logger', new Logger(global.Framework), 0);

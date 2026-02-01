@@ -68,7 +68,7 @@ class ZoneManagerModule {
    * Initialize module with JIT warm-up
    */
   async init() {
-    this.framework.utils.Log('[ZoneManager] Ultra-optimized module initializing...', 'info');
+    this.framework.log.info('[ZoneManager] Ultra-optimized module initializing...');
 
     // JIT warm-up
     if (this.config.jitWarmupEnabled) {
@@ -89,7 +89,7 @@ class ZoneManagerModule {
     // Register commands
     this.registerCommands();
 
-    this.framework.utils.Log('[ZoneManager] Ultra-optimized module ready', 'info');
+    this.framework.log.info('[ZoneManager] Ultra-optimized module ready');
   }
 
   /**
@@ -99,7 +99,7 @@ class ZoneManagerModule {
     const timer = timerPool.acquire();
     timer.start();
 
-    this.framework.utils.Log('[ZoneManager] Warming up JIT compiler...', 'info');
+    this.framework.log.info('[ZoneManager] Warming up JIT compiler...');
 
     // Create temporary zones for warm-up
     const tempZones = [];
@@ -148,7 +148,7 @@ class ZoneManagerModule {
     timerPool.release(timer);
     this._jitWarmedUp = true;
 
-    this.framework.utils.Log(`[ZoneManager] JIT warm-up completed in ${elapsed}ms`, 'info');
+    this.framework.log.info(`[ZoneManager] JIT warm-up completed in ${elapsed}ms`);
   }
 
   /**
@@ -167,7 +167,7 @@ class ZoneManagerModule {
     this._cacheCleanupTimer = setInterval(() => {
       const cleaned = this.queryCache.cleanup();
       if (cleaned > 0) {
-        this.framework.utils.Log(`[ZoneManager] Cleaned ${cleaned} expired cache entries`, 'debug');
+        this.framework.log.debug(`[ZoneManager] Cleaned ${cleaned} expired cache entries`);
       }
     }, this.config.cacheCleanupInterval);
   }
@@ -190,7 +190,9 @@ class ZoneManagerModule {
     const timer = timerPool.acquire();
     timer.start();
 
-    const players = this.framework.getPlayers();
+    const playerManager = this.framework.getModule('player-manager');
+    if (!playerManager) { timerPool.release(timer); return; }
+    const players = playerManager.players || new Map();
     let checksPerformed = 0;
 
     players.forEach((player, source) => {
@@ -401,8 +403,11 @@ class ZoneManagerModule {
    * Register RPC handlers
    */
   registerRPC() {
+    const rpc = this.framework.getModule('rpc');
+    if (!rpc) return;
+
     // Query zones at position
-    this.framework.rpc.register('zone:query', (source, x, y, range) => {
+    rpc.register('zone:query', (source, x, y, range) => {
       const zones = this.queryZones(x, y, range || 100);
       return zones.map(z => ({
         id: z.id,
@@ -413,7 +418,7 @@ class ZoneManagerModule {
     });
 
     // Get zone info
-    this.framework.rpc.register('zone:getInfo', (source, zoneId) => {
+    rpc.register('zone:getInfo', (source, zoneId) => {
       const zone = this.getZone(zoneId);
       if (!zone) return null;
 
@@ -429,7 +434,7 @@ class ZoneManagerModule {
     });
 
     // Get performance stats
-    this.framework.rpc.register('zone:getStats', () => {
+    rpc.register('zone:getStats', () => {
       return this.getPerformanceStats();
     });
   }
@@ -490,9 +495,8 @@ class ZoneManagerModule {
     // Wrap callbacks with stats tracking
     this._wrapZoneCallbacks(zone);
 
-    this.framework.utils.Log(
-      `[ZoneManager] Zone created: ${zone.name} (${type}, ${isDynamic ? 'dynamic' : 'static'})`,
-      'info'
+    this.framework.log.info(
+      `[ZoneManager] Zone created: ${zone.name} (${type}, ${isDynamic ? 'dynamic' : 'static'})`
     );
 
     this.framework.eventBus.emit('ZONE_CREATED', { zone });
@@ -584,7 +588,7 @@ class ZoneManagerModule {
 
     this.stats.recordRemoval();
 
-    this.framework.utils.Log(`[ZoneManager] Zone removed: ${zone.name}`, 'info');
+    this.framework.log.info(`[ZoneManager] Zone removed: ${zone.name}`);
     this.framework.eventBus.emit('ZONE_REMOVED', { zoneId: id });
 
     return true;
@@ -722,7 +726,7 @@ class ZoneManagerModule {
     if (!zone) return false;
 
     zone.addTag(tag);
-    this.framework.utils.Log(`[ZoneManager] Tag '${tag}' added to zone ${zone.name}`, 'info');
+    this.framework.log.info(`[ZoneManager] Tag '${tag}' added to zone ${zone.name}`);
     return true;
   }
 
@@ -737,7 +741,7 @@ class ZoneManagerModule {
     if (!zone) return false;
 
     zone.removeTag(tag);
-    this.framework.utils.Log(`[ZoneManager] Tag '${tag}' removed from zone ${zone.name}`, 'info');
+    this.framework.log.info(`[ZoneManager] Tag '${tag}' removed from zone ${zone.name}`);
     return true;
   }
 
@@ -752,7 +756,7 @@ class ZoneManagerModule {
     if (!zone) return false;
 
     zone.priority = priority;
-    this.framework.utils.Log(`[ZoneManager] Zone ${zone.name} priority set to ${priority}`, 'info');
+    this.framework.log.info(`[ZoneManager] Zone ${zone.name} priority set to ${priority}`);
     return true;
   }
 
@@ -768,9 +772,8 @@ class ZoneManagerModule {
 
     if (!zone.excludes.includes(excludedZoneId)) {
       zone.excludes.push(excludedZoneId);
-      this.framework.utils.Log(
-        `[ZoneManager] Zone ${zone.name} will be excluded when player is in zone ${excludedZoneId}`,
-        'info'
+      this.framework.log.info(
+        `[ZoneManager] Zone ${zone.name} will be excluded when player is in zone ${excludedZoneId}`
       );
     }
 
@@ -790,9 +793,8 @@ class ZoneManagerModule {
     const index = zone.excludes.indexOf(excludedZoneId);
     if (index > -1) {
       zone.excludes.splice(index, 1);
-      this.framework.utils.Log(
-        `[ZoneManager] Exclusion removed from zone ${zone.name}`,
-        'info'
+      this.framework.log.info(
+        `[ZoneManager] Exclusion removed from zone ${zone.name}`
       );
     }
 
@@ -818,7 +820,7 @@ class ZoneManagerModule {
     this.queryCache.clear();
     this.positionCache.clear();
 
-    this.framework.utils.Log('[ZoneManager] All zones cleared', 'info');
+    this.framework.log.info('[ZoneManager] All zones cleared');
     this.framework.eventBus.emit('ZONES_CLEARED');
   }
 
@@ -831,9 +833,8 @@ class ZoneManagerModule {
 
     zone.enabled = enabled;
 
-    this.framework.utils.Log(
-      `[ZoneManager] Zone ${zone.name} ${enabled ? 'enabled' : 'disabled'}`,
-      'info'
+    this.framework.log.info(
+      `[ZoneManager] Zone ${zone.name} ${enabled ? 'enabled' : 'disabled'}`
     );
 
     return true;
@@ -914,9 +915,9 @@ class ZoneManagerModule {
         this.create(zoneData.type, zoneData);
       }
 
-      this.framework.utils.Log(`[ZoneManager] Imported ${zonesData.length} zones`, 'info');
+      this.framework.log.info(`[ZoneManager] Imported ${zonesData.length} zones`);
     } catch (error) {
-      this.framework.utils.Log(`[ZoneManager] Import failed: ${error.message}`, 'error');
+      this.framework.log.error(`[ZoneManager] Import failed: ${error.message}`);
     }
   }
 
@@ -930,8 +931,11 @@ class ZoneManagerModule {
 
     this.clearAll();
 
-    this.framework.utils.Log('[ZoneManager] Module destroyed', 'info');
+    this.framework.log.info('[ZoneManager] Module destroyed');
   }
 }
 
 module.exports = ZoneManagerModule;
+
+// Self-register
+global.Framework.register('zone-manager', new ZoneManagerModule(global.Framework), 12);

@@ -6,7 +6,7 @@
 class Whitelist {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // In-memory cache for fast lookups
@@ -21,12 +21,13 @@ class Whitelist {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
 
     // Load whitelist from database
     await this.loadWhitelist();
 
     // Register player connecting hook
-    this.framework.registerHook(
+    this.framework.events.on(
       this.framework.constants.Hooks.BEFORE_PLAYER_JOIN,
       this.checkWhitelist.bind(this)
     );
@@ -61,10 +62,12 @@ class Whitelist {
 
   /**
    * Check if player is whitelisted (called before player joins)
+   * @param {Object} data - { source, deferrals }
    */
-  async checkWhitelist(source, deferrals) {
+  async checkWhitelist(data) {
+    const { source, deferrals } = data;
     if (!this.enabled) {
-      return; // Whitelist disabled
+      return data; // Whitelist disabled - pass through
     }
 
     const identifiers = this.getPlayerIdentifiers(source);
@@ -234,9 +237,12 @@ class Whitelist {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Whitelist] ${message}`, level);
+      this.framework.log[level](`[Whitelist] ${message}`);
     }
   }
 }
 
 module.exports = Whitelist;
+
+// Self-register
+global.Framework.register('whitelist', new Whitelist(global.Framework), 8);

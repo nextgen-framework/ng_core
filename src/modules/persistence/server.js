@@ -13,7 +13,7 @@
 class PersistenceManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // Registered save handlers from modules
@@ -38,6 +38,7 @@ class PersistenceManager {
 
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
 
     // Register event handlers
     this.registerEvents();
@@ -301,3 +302,6 @@ class PersistenceManager {
 }
 
 module.exports = PersistenceManager;
+
+// Self-register
+global.Framework.register('persistence', new PersistenceManager(global.Framework), 3);

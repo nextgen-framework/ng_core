@@ -6,7 +6,7 @@
 class SpawnManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.playerManager = null;
     this.zoneManager = null;
@@ -59,6 +59,7 @@ class SpawnManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
     this.zoneManager = this.framework.getModule('zone-manager');
 
@@ -82,9 +83,10 @@ class SpawnManager {
     });
 
     // RPC handlers
-    if (this.framework.rpc) {
-      this.framework.rpc.register('spawn:getAvailableSpawns', this.getAvailableSpawnsForPlayer.bind(this));
-      this.framework.rpc.register('spawn:selectSpawn', this.selectSpawn.bind(this));
+    const rpc = this.framework.getModule('rpc');
+    if (rpc) {
+      rpc.register('spawn:getAvailableSpawns', this.getAvailableSpawnsForPlayer.bind(this));
+      rpc.register('spawn:selectSpawn', this.selectSpawn.bind(this));
     }
 
     this.log(`Spawn manager initialized with ${this.spawnPoints.size} spawn points`, 'info');
@@ -193,7 +195,7 @@ class SpawnManager {
     // If spawn selection is enabled, send available spawns to client
     if (this.config.enableSpawnSelection) {
       const availableSpawns = await this.getAvailableSpawnsForPlayer(source);
-      emitNet('ng_core:spawn-select', source, availableSpawns);
+      this.framework.fivem.emitNet('ng_core:spawn-select', source, availableSpawns);
     } else {
       // Spawn at default location
       const defaultSpawn = this.getDefaultSpawn();
@@ -234,7 +236,7 @@ class SpawnManager {
     if (spawn.category === 'default') return true;
 
     // Can be extended by plugins via framework hooks
-    const result = await this.framework.runHook(
+    const result = await this.framework.events.pipe(
       'spawn:checkPermission',
       source,
       spawn
@@ -275,7 +277,7 @@ class SpawnManager {
    */
   spawnPlayerAt(source, coords) {
     // Send spawn command to client
-    emitNet('ng_core:spawn-at', source, coords, {
+    this.framework.fivem.emitNet('ng_core:spawn-at', source, coords, {
       fadeIn: this.config.spawnFadeIn,
       fadeDuration: this.config.spawnFadeDuration
     });
@@ -456,7 +458,7 @@ class SpawnManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Spawn Manager] ${message}`, level);
+      this.framework.log[level](`[Spawn Manager] ${message}`);
     }
   }
 
@@ -479,3 +481,6 @@ class SpawnManager {
 }
 
 module.exports = SpawnManager;
+
+// Self-register
+global.Framework.register('spawn-manager', new SpawnManager(global.Framework), 15);

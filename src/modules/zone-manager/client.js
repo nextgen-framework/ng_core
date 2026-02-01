@@ -266,13 +266,16 @@ class ZoneManagerClientModule {
    * Register RPC handlers
    */
   registerRPC() {
+    const rpc = this.framework.getModule('rpc');
+    if (!rpc) return;
+
     // Sync zone from server
-    this.framework.rpc.register('zone:sync', (zoneData) => {
+    rpc.register('zone:sync', (zoneData) => {
       this.createFromData(zoneData);
     });
 
     // Remove zone
-    this.framework.rpc.register('zone:remove', (zoneId) => {
+    rpc.register('zone:remove', (zoneId) => {
       this.remove(zoneId);
     });
   }
@@ -463,3 +466,6 @@ class ZoneManagerClientModule {
 if (typeof global !== 'undefined') {
   global.NgModule_zone_manager = ZoneManagerClientModule;
 }
+
+// Self-register
+global.Framework.register('zone-manager', new ZoneManagerClientModule(global.Framework), 12);

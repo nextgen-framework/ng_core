@@ -38,7 +38,7 @@ class ZoneManagerModule {
    * Initialize the zone manager module
    */
   async init() {
-    this.framework.utils.Log('Zone Manager Module initializing...', 'info');
+    this.framework.log.info('Zone Manager Module initializing...');
 
     // Initialize spatial partitioning
     this.initializeSpatial();
@@ -52,7 +52,7 @@ class ZoneManagerModule {
     // Register RPC handlers
     this.registerRPC();
 
-    this.framework.utils.Log('Zone Manager Module initialized', 'info');
+    this.framework.log.info('Zone Manager Module initialized');
   }
 
   /**
@@ -72,11 +72,11 @@ class ZoneManagerModule {
         capacity: options.capacity || 10,
         maxDepth: options.maxDepth || 8
       });
-      this.framework.utils.Log('Using QuadTree spatial partitioning', 'info');
+      this.framework.log.info('Using QuadTree spatial partitioning');
     } else {
       // Grid is faster for most use cases
       this.spatial = new SpatialGrid(bounds, options.cellSize || 100);
-      this.framework.utils.Log('Using Grid spatial partitioning', 'info');
+      this.framework.log.info('Using Grid spatial partitioning');
     }
 
     this.spatialMethod = method;
@@ -197,7 +197,7 @@ class ZoneManagerModule {
     this.spatial.insert(zone);
     this.stats.totalZones = this.zones.size;
 
-    this.framework.utils.Log(`Zone created: ${zone.name} (${type})`, 'info');
+    this.framework.log.info(`Zone created: ${zone.name} (${type})`);
 
     // Emit event
     this.framework.eventBus.emit('ZONE_CREATED', { zone });
@@ -240,7 +240,7 @@ class ZoneManagerModule {
     zone.destroy();
     this.stats.totalZones = this.zones.size;
 
-    this.framework.utils.Log(`Zone removed: ${zone.name}`, 'info');
+    this.framework.log.info(`Zone removed: ${zone.name}`);
 
     // Emit event
     this.framework.eventBus.emit('ZONE_REMOVED', { zoneId: id });
@@ -329,7 +329,7 @@ class ZoneManagerModule {
     this.spatial.clear();
     this.stats.totalZones = 0;
 
-    this.framework.utils.Log('All zones cleared', 'info');
+    this.framework.log.info('All zones cleared');
 
     // Emit event
     this.framework.eventBus.emit('ZONES_CLEARED');
@@ -345,7 +345,7 @@ class ZoneManagerModule {
     if (!zone) return false;
 
     zone.enabled = enabled;
-    this.framework.utils.Log(`Zone ${zone.name} ${enabled ? 'enabled' : 'disabled'}`, 'info');
+    this.framework.log.info(`Zone ${zone.name} ${enabled ? 'enabled' : 'disabled'}`);
 
     return true;
   }
@@ -367,13 +367,13 @@ class ZoneManagerModule {
    * Rebuild spatial partitioning (useful after many zone updates)
    */
   rebuildSpatial() {
-    this.framework.utils.Log('Rebuilding spatial partitioning...', 'info');
+    this.framework.log.info('Rebuilding spatial partitioning...');
     const startTime = Date.now();
 
     this.spatial.rebuild();
 
     const elapsed = Date.now() - startTime;
-    this.framework.utils.Log(`Spatial partitioning rebuilt in ${elapsed}ms`, 'info');
+    this.framework.log.info(`Spatial partitioning rebuilt in ${elapsed}ms`);
   }
 
   /**
@@ -432,9 +432,9 @@ class ZoneManagerModule {
         this.create(zoneData.type, zoneData);
       }
 
-      this.framework.utils.Log(`Imported ${zonesData.length} zones`, 'info');
+      this.framework.log.info(`Imported ${zonesData.length} zones`);
     } catch (error) {
-      this.framework.utils.Log(`Failed to import zones: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to import zones: ${error.message}`);
     }
   }
 
@@ -444,7 +444,7 @@ class ZoneManagerModule {
   async destroy() {
     this.stopUpdateLoop();
     this.clearAll();
-    this.framework.utils.Log('Zone Manager Module destroyed', 'info');
+    this.framework.log.info('Zone Manager Module destroyed');
   }
 }
 

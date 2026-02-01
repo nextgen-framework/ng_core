@@ -15,7 +15,7 @@ class PlayerManager {
    */
   async init() {
     this.registerEvents();
-    this.framework.utils.Log('Player Manager module initialized', 'info');
+    this.framework.log.info('Player Manager module initialized');
   }
 
   /**
@@ -24,18 +24,18 @@ class PlayerManager {
   registerEvents() {
     // Player connecting
     on('playerConnecting', async (name, setKickReason, deferrals) => {
+      const playerSource = source;
       deferrals.defer();
       deferrals.update('Checking with framework...');
 
       try {
-
-        // Run hooks
-        await this.framework.runHook(this.framework.constants.Hooks.BEFORE_PLAYER_JOIN, source, deferrals);
+        // Run hooks - pass single object (pipe only accepts one data arg)
+        await this.framework.events.pipe(this.framework.constants.Hooks.BEFORE_PLAYER_JOIN, { source: playerSource, deferrals });
 
         // Queue/connection-manager handles deferrals - don't call done() here
         // deferrals.done(); will be called by queue or connection-manager
       } catch (error) {
-        this.framework.utils.Log(`Player connection error: ${error.message}`, 'error');
+        this.framework.log.error(`Player connection error: ${error.message}`);
         deferrals.done(error.message);
       }
     });
@@ -46,16 +46,17 @@ class PlayerManager {
       const playerSource = source;
       await this.create(playerSource);
       this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, playerSource);
-      await this.framework.runHook(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, playerSource);
+      await this.framework.events.pipe(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, playerSource);
     });
 
     // Player dropped
     on('playerDropped', async (reason) => {
+      const playerSource = source;
 
-      await this.framework.runHook(this.framework.constants.Hooks.BEFORE_PLAYER_LEAVE, source, reason);
-      await this.remove(source);
-      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_DROPPED, source, reason);
-      await this.framework.runHook(this.framework.constants.Hooks.AFTER_PLAYER_LEAVE, source, reason);
+      await this.framework.events.pipe(this.framework.constants.Hooks.BEFORE_PLAYER_LEAVE, { source: playerSource, reason });
+      await this.remove(playerSource);
+      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_DROPPED, playerSource, reason);
+      await this.framework.events.pipe(this.framework.constants.Hooks.AFTER_PLAYER_LEAVE, { source: playerSource, reason });
     });
   }
 
@@ -348,7 +349,7 @@ class PlayerClass {
    * @param {...*} args
    */
   triggerEvent(eventName, ...args) {
-    emitNet(eventName, this.source, ...args);
+    this.framework.fivem.emitNet(eventName, this.source, ...args);
   }
 
   /**
@@ -358,7 +359,9 @@ class PlayerClass {
    * @returns {Promise<*>}
    */
   async callRPC(rpcName, ...args) {
-    return await this.framework.rpc.callClient(rpcName, this.source, ...args);
+    const rpc = this.framework.getModule('rpc');
+    if (!rpc) return null;
+    return await rpc.callClient(rpcName, this.source, ...args);
   }
 
   /**
@@ -398,3 +401,6 @@ class PlayerClass {
 }
 
 module.exports = PlayerManager;
+
+// Self-register
+global.Framework.register('player-manager', new PlayerManager(global.Framework), 10);

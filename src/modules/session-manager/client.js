@@ -8,6 +8,14 @@ class SessionManagerClient {
     this.framework = framework;
     this.currentSession = null;
     this.isSpectating = false;
+
+    // Pre-registered at script load time (cerulean)
+    this.netEvents = [
+      'ng_core:session-created', 'ng_core:session-joined', 'ng_core:session-left',
+      'ng_core:session-started', 'ng_core:session-ended',
+      'ng_core:session-player-joined', 'ng_core:session-player-left',
+      'ng_core:session-host-changed', 'ng_core:session-spectating', 'ng_core:session-spectating-ended'
+    ];
   }
 
   /**
@@ -15,16 +23,16 @@ class SessionManagerClient {
    */
   init() {
     // Listen for session events
-    onNet('ng_core:session-created', this.onSessionCreated.bind(this));
-    onNet('ng_core:session-joined', this.onSessionJoined.bind(this));
-    onNet('ng_core:session-left', this.onSessionLeft.bind(this));
-    onNet('ng_core:session-started', this.onSessionStarted.bind(this));
-    onNet('ng_core:session-ended', this.onSessionEnded.bind(this));
-    onNet('ng_core:session-player-joined', this.onPlayerJoined.bind(this));
-    onNet('ng_core:session-player-left', this.onPlayerLeft.bind(this));
-    onNet('ng_core:session-host-changed', this.onHostChanged.bind(this));
-    onNet('ng_core:session-spectating', this.onSpectating.bind(this));
-    onNet('ng_core:session-spectating-ended', this.onSpectatingEnded.bind(this));
+    this.framework.onNet('ng_core:session-created', this.onSessionCreated.bind(this));
+    this.framework.onNet('ng_core:session-joined', this.onSessionJoined.bind(this));
+    this.framework.onNet('ng_core:session-left', this.onSessionLeft.bind(this));
+    this.framework.onNet('ng_core:session-started', this.onSessionStarted.bind(this));
+    this.framework.onNet('ng_core:session-ended', this.onSessionEnded.bind(this));
+    this.framework.onNet('ng_core:session-player-joined', this.onPlayerJoined.bind(this));
+    this.framework.onNet('ng_core:session-player-left', this.onPlayerLeft.bind(this));
+    this.framework.onNet('ng_core:session-host-changed', this.onHostChanged.bind(this));
+    this.framework.onNet('ng_core:session-spectating', this.onSpectating.bind(this));
+    this.framework.onNet('ng_core:session-spectating-ended', this.onSpectatingEnded.bind(this));
 
     console.log('[Session Manager] Client initialized');
   }
@@ -194,14 +202,14 @@ class SessionManagerClient {
    * Request to create session
    */
   createSession(type, options) {
-    emitNet('ng_core:session-create', type, options);
+    this.framework.fivem.emitNet('ng_core:session-create', type, options);
   }
 
   /**
    * Request to join session
    */
   joinSession(sessionId) {
-    emitNet('ng_core:session-join', sessionId);
+    this.framework.fivem.emitNet('ng_core:session-join', sessionId);
   }
 
   /**
@@ -209,7 +217,7 @@ class SessionManagerClient {
    */
   leaveSession() {
     if (this.currentSession) {
-      emitNet('ng_core:session-leave');
+      this.framework.fivem.emitNet('ng_core:session-leave');
     }
   }
 
@@ -218,10 +226,13 @@ class SessionManagerClient {
    */
   startSession() {
     if (this.currentSession && this.currentSession.isHost) {
-      emitNet('ng_core:session-start');
+      this.framework.fivem.emitNet('ng_core:session-start');
     }
   }
 }
 
 // Export to global scope for framework (FiveM client environment)
 if (typeof global !== "undefined") { global.NgModule_session_manager = SessionManagerClient; }
+
+// Self-register
+global.Framework.register('session-manager', new SessionManagerClient(global.Framework), 12);

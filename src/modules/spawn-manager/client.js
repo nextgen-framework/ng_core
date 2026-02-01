@@ -7,6 +7,10 @@ class SpawnManagerClient {
   constructor(framework) {
     this.framework = framework;
     this.hasSpawned = false;
+    this.defaultModel = 'mp_m_freemode_01';
+
+    // Pre-registered at script load time (cerulean)
+    this.netEvents = ['ng_core:spawn-at', 'ng_core:spawn-select'];
   }
 
   /**
@@ -14,12 +18,15 @@ class SpawnManagerClient {
    */
   init() {
     // Listen for spawn events
-    onNet('ng_core:spawn-at', this.onSpawnAt.bind(this));
-    onNet('ng_core:spawn-select', this.onSpawnSelect.bind(this));
+    this.framework.onNet('ng_core:spawn-at', this.onSpawnAt.bind(this));
+    this.framework.onNet('ng_core:spawn-select', this.onSpawnSelect.bind(this));
 
     // Freeze player until spawn
-    FreezeEntityPosition(PlayerPedId(), true);
-    SetEntityVisible(PlayerPedId(), false, false);
+    const ped = PlayerPedId();
+    if (ped && DoesEntityExist(ped)) {
+      FreezeEntityPosition(ped, true);
+      SetEntityVisible(ped, false, false);
+    }
 
     console.log('[Spawn Manager] Client initialized');
   }
@@ -27,62 +34,101 @@ class SpawnManagerClient {
   /**
    * Handle spawn at specific coordinates
    */
-  onSpawnAt(coords, options) {
-    const playerPed = PlayerPedId();
-
+  async onSpawnAt(coords, options) {
     // Fade out if needed
-    if (options.fadeIn) {
+    if (options && options.fadeIn) {
       DoScreenFadeOut(500);
-      setTimeout(() => {
-        this.spawnPlayer(playerPed, coords, options);
-      }, 500);
-    } else {
-      this.spawnPlayer(playerPed, coords, options);
+      await this.delay(500);
     }
+
+    // Ensure player has a valid ped model
+    await this.ensurePlayerModel(options?.model || this.defaultModel);
+
+    const playerPed = PlayerPedId();
+    await this.spawnPlayer(playerPed, coords, options || {});
+  }
+
+  /**
+   * Ensure player has a valid ped model loaded
+   */
+  async ensurePlayerModel(modelName) {
+    const modelHash = GetHashKey(modelName);
+
+    // Check if model is valid
+    if (!IsModelInCdimage(modelHash) || !IsModelValid(modelHash)) {
+      console.log(`[Spawn Manager] Invalid model: ${modelName}, using default`);
+      return;
+    }
+
+    // Request model
+    RequestModel(modelHash);
+
+    // Wait for model to load
+    let attempts = 0;
+    while (!HasModelLoaded(modelHash) && attempts < 100) {
+      await this.delay(10);
+      attempts++;
+    }
+
+    if (!HasModelLoaded(modelHash)) {
+      console.log(`[Spawn Manager] Failed to load model: ${modelName}`);
+      return;
+    }
+
+    // Set player model
+    SetPlayerModel(PlayerId(), modelHash);
+    SetModelAsNoLongerNeeded(modelHash);
+
+    console.log(`[Spawn Manager] Player model set: ${modelName}`);
   }
 
   /**
    * Spawn player at coordinates
    */
-  spawnPlayer(playerPed, coords, options) {
-    // Set player position
+  async spawnPlayer(playerPed, coords, options) {
+    // Request collision at spawn point
     RequestCollisionAtCoord(coords.x, coords.y, coords.z);
+
+    // Set player position
     SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false);
     SetEntityHeading(playerPed, coords.heading || 0);
 
     // Wait for collision to load
     let attempts = 0;
-    const checkCollision = setInterval(() => {
+    while (!HasCollisionLoadedAroundEntity(playerPed) && attempts < 100) {
+      await this.delay(100);
       attempts++;
+    }
 
-      if (HasCollisionLoadedAroundEntity(playerPed) || attempts > 100) {
-        clearInterval(checkCollision);
+    // Unfreeze and show player
+    FreezeEntityPosition(playerPed, false);
+    SetEntityVisible(playerPed, true, false);
 
-        // Unfreeze and show player
-        FreezeEntityPosition(playerPed, false);
-        SetEntityVisible(playerPed, true, false);
+    // Network culling
+    NetworkSetEntityInvisibleToNetwork(playerPed, false);
+    SetPlayerInvincible(PlayerId(), false);
 
-        // Network culling
-        NetworkSetEntityInvisibleToNetwork(playerPed, false);
-        SetPlayerInvincible(playerPed, false);
+    // Reset camera
+    RenderScriptCams(false, false, 0, true, true);
 
-        // Camera
-        RenderScriptCams(false, false, 0, true, true);
-        SetCamActive(GetDefaultCam(), true);
+    // Fade in
+    if (options.fadeIn) {
+      DoScreenFadeIn(options.fadeDuration || 1500);
+    }
 
-        // Fade in
-        if (options.fadeIn) {
-          DoScreenFadeIn(options.fadeDuration || 1500);
-        }
+    this.hasSpawned = true;
 
-        this.hasSpawned = true;
+    console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
 
-        console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
+    // Trigger event for other modules
+    this.framework.fivem.emit('ng_core:player-spawned', coords);
+  }
 
-        // Trigger event for other modules
-        emit('ng_core:player-spawned', coords);
-      }
-    }, 100);
+  /**
+   * Helper delay function
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -93,7 +139,7 @@ class SpawnManagerClient {
     // For now, just pick the first spawn
     if (availableSpawns.length > 0) {
       const spawn = availableSpawns[0];
-      emitNet('ng_core:spawn-selected', spawn.id);
+      this.framework.fivem.emitNet('ng_core:spawn-selected', spawn.id);
     }
   }
 
@@ -107,3 +153,6 @@ class SpawnManagerClient {
 
 // Export to global scope for framework (FiveM client environment)
 if (typeof global !== "undefined") { global.NgModule_spawn_manager = SpawnManagerClient; }
+
+// Self-register
+global.Framework.register('spawn-manager', new SpawnManagerClient(global.Framework), 15);

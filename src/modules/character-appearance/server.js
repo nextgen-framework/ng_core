@@ -15,7 +15,7 @@ class CharacterAppearanceModule {
   async init() {
     this.registerEvents();
     this.registerHooks();
-    this.framework.utils.Log('Character Appearance Module initialized', 'info');
+    this.framework.log.info('Character Appearance Module initialized');
   }
 
   /**
@@ -23,13 +23,13 @@ class CharacterAppearanceModule {
    */
   registerEvents() {
     // When player spawns, send their appearance
-    onNet('ng_core:request-appearance', () => {
+    this.framework.onNet('ng_core:request-appearance', () => {
       const playerSource = source;
       this.sendAppearance(playerSource);
     });
 
     // Save appearance from client
-    onNet('ng_core:save-appearance', (appearance) => {
+    this.framework.onNet('ng_core:save-appearance', (appearance) => {
       const playerSource = source;
       this.saveAppearance(playerSource, appearance);
     });
@@ -40,7 +40,7 @@ class CharacterAppearanceModule {
    */
   registerHooks() {
     // Load appearance during LOADING stage
-    this.framework.registerHook(
+    this.framework.events.on(
       this.framework.constants.Hooks.PLAYER_LOADING,
       async (data) => {
         // Extract source from data object
@@ -48,11 +48,11 @@ class CharacterAppearanceModule {
 
         // Validate source before processing
         if (!playerSource || typeof playerSource !== 'number') {
-          this.framework.utils.Log(`Invalid source in PLAYER_LOADING hook: ${playerSource}`, 'warn');
+          this.framework.log.warn(`Invalid source in PLAYER_LOADING hook: ${playerSource}`);
           return;
         }
 
-        this.framework.utils.Log(`Loading appearance for player ${playerSource}...`, 'info');
+        this.framework.log.info(`Loading appearance for player ${playerSource}...`);
 
         // Load or create default appearance
         await this.loadAppearance(playerSource);
@@ -75,7 +75,7 @@ class CharacterAppearanceModule {
     const defaultAppearance = this.getDefaultAppearance();
 
     this.playerAppearances.set(source, defaultAppearance);
-    this.framework.utils.Log(`Appearance loaded for player ${source}`, 'info');
+    this.framework.log.info(`Appearance loaded for player ${source}`);
   }
 
   /**
@@ -125,14 +125,14 @@ class CharacterAppearanceModule {
   sendAppearance(source) {
     // Validate source before proceeding
     if (!source || source < 0 || typeof source !== 'number') {
-      this.framework.utils.Log(`Invalid source in sendAppearance: ${source}`, 'warn');
+      this.framework.log.warn(`Invalid source in sendAppearance: ${source}`);
       return;
     }
 
     const appearance = this.playerAppearances.get(source) || this.getDefaultAppearance();
 
-    emitNet('ng_core:apply-appearance', source, appearance);
-    this.framework.utils.Log(`Appearance sent to player ${source}`, 'info');
+    this.framework.fivem.emitNet('ng_core:apply-appearance', source, appearance);
+    this.framework.log.info(`Appearance sent to player ${source}`);
   }
 
   /**
@@ -142,7 +142,7 @@ class CharacterAppearanceModule {
     this.playerAppearances.set(source, appearance);
 
     // Later: Save to database here
-    this.framework.utils.Log(`Appearance saved for player ${source}`, 'info');
+    this.framework.log.info(`Appearance saved for player ${source}`);
   }
 
   /**
@@ -166,9 +166,12 @@ class CharacterAppearanceModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.utils.Log('Character Appearance Module destroyed', 'info');
+    this.framework.log.info('Character Appearance Module destroyed');
     this.playerAppearances.clear();
   }
 }
 
 module.exports = CharacterAppearanceModule;
+
+// Self-register
+global.Framework.register('character-appearance', new CharacterAppearanceModule(global.Framework), 14);

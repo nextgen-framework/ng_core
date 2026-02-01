@@ -12,7 +12,7 @@
 class TargetManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // Server-registered options (for validation)
@@ -27,6 +27,7 @@ class TargetManager {
 
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
 
     // Register RPC handlers
     this.registerRPC();
@@ -166,3 +167,6 @@ class TargetManager {
 }
 
 module.exports = TargetManager;
+
+// Self-register
+global.Framework.register('target', new TargetManager(global.Framework), 13);

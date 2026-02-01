@@ -13,12 +13,12 @@ class ChatCommandsModule {
    * Initialize the chat commands module
    */
   async init() {
-    this.framework.utils.Log('Chat Commands Module initialized', 'info');
+    this.framework.log.info('Chat Commands Module initialized');
 
     // Register default commands
     this.registerDefaultCommands();
 
-    this.framework.utils.Log('Chat Commands Module ready', 'info');
+    this.framework.log.info('Chat Commands Module ready');
   }
 
   /**
@@ -80,7 +80,7 @@ class ChatCommandsModule {
         command.handler(source, args, rawCommand);
       } catch (error) {
         this.sendMessage(source, `^1Error: ^7${error.message}`);
-        this.framework.utils.Log(`Command error (/${command.name}): ${error.message}`, 'error');
+        this.framework.log.error(`Command error (/${command.name}): ${error.message}`);
       }
     }, command.restricted);
 
@@ -98,7 +98,7 @@ class ChatCommandsModule {
           command.handler(source, args, rawCommand);
         } catch (error) {
           this.sendMessage(source, `^1Error: ^7${error.message}`);
-          this.framework.utils.Log(`Command error (/${alias}): ${error.message}`, 'error');
+          this.framework.log.error(`Command error (/${alias}): ${error.message}`);
         }
       }, command.restricted);
     });
@@ -123,7 +123,7 @@ class ChatCommandsModule {
 
     // Log with plugin info
     const pluginInfo = command.plugin !== 'unknown' ? ` [${command.plugin}]` : '';
-    this.framework.utils.Log(`Command registered: /${command.name}${pluginInfo}`, 'info');
+    this.framework.log.info(`Command registered: /${command.name}${pluginInfo}`);
   }
 
   /**
@@ -140,7 +140,7 @@ class ChatCommandsModule {
   sendMessage(source, message) {
     // Validate source before sending
     if (!source || source < 0) {
-      this.framework.utils.Log(`Invalid source in sendMessage: ${source}`, 'warn');
+      this.framework.log.warn(`Invalid source in sendMessage: ${source}`);
       return;
     }
 
@@ -220,7 +220,7 @@ class ChatCommandsModule {
     const command = this.commands.get(name.toLowerCase());
     if (command) {
       this.commands.delete(name.toLowerCase());
-      this.framework.utils.Log(`Command unregistered: /${name}`, 'info');
+      this.framework.log.info(`Command unregistered: /${name}`);
 
       // Note: FiveM doesn't provide UnregisterCommand, so the command will still exist
       // but won't be in our tracking map
@@ -231,9 +231,12 @@ class ChatCommandsModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.utils.Log('Chat Commands Module destroyed', 'info');
+    this.framework.log.info('Chat Commands Module destroyed');
     this.commands.clear();
   }
 }
 
 module.exports = ChatCommandsModule;
+
+// Self-register
+global.Framework.register('chat-commands', new ChatCommandsModule(global.Framework), 15);

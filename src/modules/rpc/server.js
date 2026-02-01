@@ -16,7 +16,7 @@ class RPCModule {
    */
   async init() {
     this.registerEventHandlers();
-    this.framework.utils.Log('RPC module initialized', 'info');
+    this.framework.log.info('RPC module initialized');
   }
 
   /**
@@ -24,7 +24,7 @@ class RPCModule {
    */
   registerEventHandlers() {
     // Handle RPC requests from clients
-    onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
+    this.framework.onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
       // Note: 'source' is a magic global variable in FiveM event handlers
 
       try {
@@ -37,13 +37,13 @@ class RPCModule {
         const result = await handler(source, ...args);
 
         // Send response back to client
-        emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
           success: true,
           data: result
         });
       } catch (error) {
         // Send error response
-        emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
           success: false,
           error: error.message
         });
@@ -53,7 +53,7 @@ class RPCModule {
     });
 
     // Handle RPC responses (for server -> client calls)
-    onNet(global.NextGenConstants.Events.RPC_RESPONSE, (callId, response) => {
+    this.framework.onNet(global.NextGenConstants.Events.RPC_RESPONSE, (callId, response) => {
       const pending = this.pendingCalls.get(callId);
       if (pending) {
         clearTimeout(pending.timeout);
@@ -112,7 +112,7 @@ class RPCModule {
       this.pendingCalls.set(callId, { resolve, reject, timeout });
 
       // Send RPC request to client
-      emitNet(global.NextGenConstants.Events.RPC_REQUEST, source, callId, rpcName, ...args);
+      this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_REQUEST, source, callId, rpcName, ...args);
     });
   }
 
@@ -150,7 +150,8 @@ class RPCModule {
    * @returns {Promise<Map<number, *>>}
    */
   async callAllClients(rpcName, ...args) {
-    const players = this.framework.getPlayers();
+    const playerManager = this.framework.getModule('player-manager');
+    const players = playerManager ? playerManager.players : new Map();
     const sources = Array.from(players.keys());
     return await this.callClients(rpcName, sources, ...args);
   }
@@ -182,3 +183,6 @@ class RPCModule {
 }
 
 module.exports = RPCModule;
+
+// Self-register
+global.Framework.register('rpc', new RPCModule(global.Framework), 5);

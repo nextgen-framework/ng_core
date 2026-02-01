@@ -6,7 +6,7 @@
 class CharacterManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.playerManager = null;
 
@@ -31,14 +31,16 @@ class CharacterManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
 
     // RPC handlers
-    if (this.framework.rpc) {
-      this.framework.rpc.register('character:getCharacters', this.getPlayerCharacters.bind(this));
-      this.framework.rpc.register('character:createCharacter', this.createCharacter.bind(this));
-      this.framework.rpc.register('character:selectCharacter', this.selectCharacter.bind(this));
-      this.framework.rpc.register('character:deleteCharacter', this.deleteCharacter.bind(this));
+    const rpc = this.framework.getModule('rpc');
+    if (rpc) {
+      rpc.register('character:getCharacters', this.getPlayerCharacters.bind(this));
+      rpc.register('character:createCharacter', this.createCharacter.bind(this));
+      rpc.register('character:selectCharacter', this.selectCharacter.bind(this));
+      rpc.register('character:deleteCharacter', this.deleteCharacter.bind(this));
     }
 
     // Handle player drop
@@ -144,7 +146,7 @@ class CharacterManager {
       });
 
       // Trigger hook for other modules (e.g., money-manager to create account)
-      await this.framework.runHook('character:created', source, characterId, characterData);
+      await this.framework.events.pipe('character:created', { source, characterId, characterData });
 
       return {
         success: true,
@@ -219,7 +221,7 @@ class CharacterManager {
       this.log(`Player ${source} selected character ${characterId}`, 'info');
 
       // Trigger hook for other modules to load character data
-      await this.framework.runHook('character:selected', source, character);
+      await this.framework.events.pipe('character:selected', { source, character });
 
       return { success: true, character };
     } catch (error) {
@@ -254,7 +256,7 @@ class CharacterManager {
       }
 
       // Trigger hook before deletion (other modules can clean up their data)
-      await this.framework.runHook('character:beforeDelete', source, characterId);
+      await this.framework.events.pipe('character:beforeDelete', { source, characterId });
 
       // Delete character
       await this.db.execute('DELETE FROM characters WHERE id = ?', [characterId]);
@@ -262,7 +264,7 @@ class CharacterManager {
       this.log(`Deleted character ${characterId}`, 'info', { source, identifier });
 
       // Trigger hook after deletion
-      await this.framework.runHook('character:deleted', source, characterId);
+      await this.framework.events.pipe('character:deleted', { source, characterId });
 
       return { success: true };
     } catch (error) {
@@ -480,7 +482,7 @@ class CharacterManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Character Manager] ${message}`, level);
+      this.framework.log[level](`[Character Manager] ${message}`);
     }
   }
 
@@ -494,3 +496,6 @@ class CharacterManager {
 }
 
 module.exports = CharacterManager;
+
+// Self-register
+global.Framework.register('character-manager', new CharacterManager(global.Framework), 14);

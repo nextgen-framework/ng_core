@@ -20,7 +20,7 @@ class PerformanceModule {
    * Initialize the performance module
    */
   async init() {
-    this.framework.utils.Log('Performance Monitor Module initialized', 'info');
+    this.framework.log.info('Performance Monitor Module initialized');
 
     // Update stats every 5 seconds
     setInterval(() => {
@@ -28,18 +28,21 @@ class PerformanceModule {
     }, 5000);
 
     // Register RPC handlers
-    this.framework.rpc.register('getServerStats', () => {
+    const rpc = this.framework.getModule('rpc');
+    if (!rpc) return;
+
+    rpc.register('getServerStats', () => {
       return this.getStats();
     });
 
-    this.framework.rpc.register('getServerPerformance', () => {
+    rpc.register('getServerPerformance', () => {
       return this.getPerformanceData();
     });
 
     // Register command
     this.registerCommands();
 
-    this.framework.utils.Log('Performance Monitor Module ready', 'info');
+    this.framework.log.info('Performance Monitor Module ready');
   }
 
   /**
@@ -76,7 +79,8 @@ class PerformanceModule {
    * Get detailed performance data
    */
   getPerformanceData() {
-    const players = this.framework.getPlayers();
+    const playerManager = this.framework.getModule('player-manager');
+    const players = playerManager ? playerManager.players : new Map();
     const playerData = [];
 
     players.forEach((player, source) => {
@@ -176,8 +180,11 @@ class PerformanceModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.utils.Log('Performance Monitor Module destroyed', 'info');
+    this.framework.log.info('Performance Monitor Module destroyed');
   }
 }
 
 module.exports = PerformanceModule;
+
+// Self-register
+global.Framework.register('performance', new PerformanceModule(global.Framework), 20);

@@ -6,7 +6,7 @@
 class MoneyManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.playerManager = null;
 
@@ -31,6 +31,7 @@ class MoneyManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
 
     // Handle player joining
@@ -166,7 +167,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng_core:money-update', source, type, money[type]);
+    this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Set ${type} for player ${source}: ${oldAmount} -> ${money[type]}`, 'info', { reason });
 
@@ -206,7 +207,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng_core:money-update', source, type, money[type]);
+    this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Added ${actualAdded} ${type} to player ${source}`, 'debug', { reason });
 
@@ -242,7 +243,7 @@ class MoneyManager {
     }
 
     // Sync to client
-    emitNet('ng_core:money-update', source, type, money[type]);
+    this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
     this.log(`Removed ${amount} ${type} from player ${source}`, 'debug', { reason });
 
@@ -320,8 +321,8 @@ class MoneyManager {
       await this.logTransaction(source, null, 'bank', amount, 'deposit', 'atm');
     }
 
-    emitNet('ng_core:money-update', source, 'cash', money.cash);
-    emitNet('ng_core:money-update', source, 'bank', money.bank);
+    this.framework.fivem.emitNet('ng_core:money-update', source, 'cash', money.cash);
+    this.framework.fivem.emitNet('ng_core:money-update', source, 'bank', money.bank);
 
     this.log(`Player ${source} deposited ${amount} to bank`, 'debug');
 
@@ -356,8 +357,8 @@ class MoneyManager {
       await this.logTransaction(source, null, 'cash', amount, 'withdraw', 'atm');
     }
 
-    emitNet('ng_core:money-update', source, 'cash', money.cash);
-    emitNet('ng_core:money-update', source, 'bank', money.bank);
+    this.framework.fivem.emitNet('ng_core:money-update', source, 'cash', money.cash);
+    this.framework.fivem.emitNet('ng_core:money-update', source, 'bank', money.bank);
 
     this.log(`Player ${source} withdrew ${amount} from bank`, 'debug');
 
@@ -494,7 +495,7 @@ class MoneyManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Money Manager] ${message}`, level);
+      this.framework.log[level](`[Money Manager] ${message}`);
     }
   }
 
@@ -513,3 +514,6 @@ class MoneyManager {
 }
 
 module.exports = MoneyManager;
+
+// Self-register
+global.Framework.register('money-manager', new MoneyManager(global.Framework), 15);

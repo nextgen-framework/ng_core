@@ -22,12 +22,12 @@ class ConnectionManager {
     this.clientReadyResolvers = new Map();
 
     // Handle player drops
-    this.framework.onNative('playerDropped', (source, reason) => {
-      this.handlePlayerDropped(source, reason);
+    on('playerDropped', (reason) => {
+      this.handlePlayerDropped(global.source, reason);
     });
 
     // Handle client ready signals
-    onNet('ng_core:client-ready', () => {
+    this.framework.onNet('ng_core:client-ready', () => {
       const clientSource = source;
 
       // Get player identifiers to match against waiting resolvers
@@ -119,7 +119,7 @@ class ConnectionManager {
    */
   updateStageProgress(source, progress, stage, message) {
     try {
-      emitNet('ng:loading:updateStageProgress', source, progress, stage, message);
+      this.framework.fivem.emitNet('ng:loading:updateStageProgress', source, progress, stage, message);
     } catch (error) {
       // Silently fail if player disconnected
     }
@@ -171,7 +171,7 @@ class ConnectionManager {
 
       // Execute PLAYER_LOADING hook
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.LOADING);
-      const loadingResult = await this.framework.runHook(
+      const loadingResult = await this.framework.events.pipe(
         this.framework.constants.Hooks.PLAYER_LOADING,
         { source, identifiers }
       );
@@ -301,7 +301,7 @@ class ConnectionManager {
 
       // Execute PLAYER_CHECK_PERMISSIONS hook
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CHECKING);
-      const permissionResult = await this.framework.runHook(
+      const permissionResult = await this.framework.events.pipe(
         this.framework.constants.Hooks.PLAYER_CHECK_PERMISSIONS,
         { source: currentSource, identifiers, playerData }
       );
@@ -333,7 +333,7 @@ class ConnectionManager {
 
       // Execute PLAYER_READY_TO_SPAWN hook
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.READY);
-      const readyResult = await this.framework.runHook(
+      const readyResult = await this.framework.events.pipe(
         this.framework.constants.Hooks.PLAYER_READY_TO_SPAWN,
         { source: currentSource, identifiers, playerData }
       );
@@ -369,10 +369,10 @@ class ConnectionManager {
       console.log(`[NextGen] [Connection] Player ${license} completed all stages in ${totalTime}ms`);
 
       // Trigger spawn on client (ng_freemode will handle the actual spawn)
-      emitNet('ng_core:readyToSpawn', currentSource);
+      this.framework.fivem.emitNet('ng_core:readyToSpawn', currentSource);
 
       // Execute PLAYER_SPAWNED hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.PLAYER_SPAWNED,
         { source: currentSource, identifiers, playerData: this.playerData.get(license) }
       );
@@ -397,7 +397,7 @@ class ConnectionManager {
     try {
       this.setPlayerStage(source, stage, data);
 
-      const hookResult = await this.framework.runHook(hookName, data);
+      const hookResult = await this.framework.events.pipe(hookName, data);
 
       // Check if any hook rejected the connection
       if (hookResult === false) {
@@ -631,7 +631,7 @@ class ConnectionManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[ConnectionManager] ${message}`, level);
+      this.framework.log[level](`[ConnectionManager] ${message}`);
     }
   }
 
@@ -653,3 +653,6 @@ class ConnectionManager {
 }
 
 module.exports = ConnectionManager;
+
+// Self-register
+global.Framework.register('connection-manager', new ConnectionManager(global.Framework), 8);

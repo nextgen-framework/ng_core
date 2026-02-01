@@ -52,7 +52,7 @@ class HardcapModule {
     });
 
     // Handle player activation (when fully loaded)
-    onNet('hardcap:playerActivated', () => {
+    this.framework.onNet('hardcap:playerActivated', () => {
 
       if (!this.activePlayers.has(source)) {
         this.playerCount++;
@@ -62,11 +62,11 @@ class HardcapModule {
     });
 
     // Handle player disconnect
-    this.framework.onNative('playerDropped', (source, reason) => {
-
-      if (this.activePlayers.has(source)) {
+    on('playerDropped', (reason) => {
+      const src = global.source;
+      if (this.activePlayers.has(src)) {
         this.playerCount--;
-        this.activePlayers.delete(source);
+        this.activePlayers.delete(src);
         console.log(`[NextGen] [Hardcap] Player dropped - Total: ${this.playerCount}/${this.maxClients}`);
       }
     });
@@ -95,3 +95,6 @@ class HardcapModule {
 }
 
 module.exports = HardcapModule;
+
+// Self-register
+global.Framework.register('hardcap', new HardcapModule(global.Framework), 10);

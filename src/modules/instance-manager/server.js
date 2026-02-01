@@ -6,7 +6,7 @@
 class InstanceManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
 
     // Instance tracking
@@ -34,6 +34,7 @@ class InstanceManager {
    */
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
 
     // Handle player drops
     on('playerDropped', () => {
@@ -157,7 +158,7 @@ class InstanceManager {
     });
 
     // Emit event
-    emitNet('ng_core:instance-joined', source, instanceId, instance.type);
+    this.framework.fivem.emitNet('ng_core:instance-joined', source, instanceId, instance.type);
 
     // Trigger cleanup check
     if (this.config.autoCleanupEmpty) {
@@ -199,7 +200,7 @@ class InstanceManager {
     });
 
     // Emit event
-    emitNet('ng_core:instance-left', source, instanceId);
+    this.framework.fivem.emitNet('ng_core:instance-left', source, instanceId);
 
     // Auto cleanup if empty
     if (this.config.autoCleanupEmpty && instance.players.size === 0) {
@@ -319,7 +320,7 @@ class InstanceManager {
     }
 
     // Send invitation to client
-    emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
+    this.framework.fivem.emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
 
     this.log(`Player ${source} invited to instance ${instanceId}`, 'debug');
 
@@ -354,7 +355,7 @@ class InstanceManager {
     if (!instance) return;
 
     for (const source of instance.players) {
-      emitNet(eventName, source, ...args);
+      this.framework.fivem.emitNet(eventName, source, ...args);
     }
   }
 
@@ -443,7 +444,7 @@ class InstanceManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Instance Manager] ${message}`, level);
+      this.framework.log[level](`[Instance Manager] ${message}`);
     }
   }
 
@@ -466,3 +467,6 @@ class InstanceManager {
 }
 
 module.exports = InstanceManager;
+
+// Self-register
+global.Framework.register('instance-manager', new InstanceManager(global.Framework), 12);

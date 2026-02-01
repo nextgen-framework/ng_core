@@ -17,11 +17,11 @@ class ResourceMonitor {
    * Initialize the resource monitor
    */
   async init() {
-    this.framework.utils.Log('Resource Monitor module initialized', 'info');
+    this.framework.log.info('Resource Monitor module initialized');
 
     // Count total resources at startup
     this.totalResources = GetNumResources();
-    this.framework.utils.Log(`Total resources detected: ${this.totalResources}`, 'info');
+    this.framework.log.info(`Total resources detected: ${this.totalResources}`);
 
     // Collect already started resources
     for (let i = 0; i < this.totalResources; i++) {
@@ -33,7 +33,7 @@ class ResourceMonitor {
       }
     }
 
-    this.framework.utils.Log(`Already started resources: ${this.startedResources.size}`, 'info');
+    this.framework.log.info(`Already started resources: ${this.startedResources.size}`);
 
     // Listen for resource starts
     on('onServerResourceStart', (resourceName) => {
@@ -53,9 +53,8 @@ class ResourceMonitor {
 
     this.startedResources.add(resourceName);
 
-    this.framework.utils.Log(
-      `Resource started: ${resourceName} (${this.startedResources.size}/${this.totalResources})`,
-      'debug'
+    this.framework.log.debug(
+      `Resource started: ${resourceName} (${this.startedResources.size}/${this.totalResources})`
     );
 
     // Reset stability timer - we just got a new resource
@@ -87,7 +86,7 @@ class ResourceMonitor {
     if (this.allResourcesLoaded) return;
 
     this.allResourcesLoaded = true;
-    this.framework.utils.Log('All server resources have finished loading!', 'info');
+    this.framework.log.info('All server resources have finished loading!');
 
     // Emit event
     this.framework.eventBus.emit(this.framework.constants.Events.ALL_RESOURCES_LOADED);
@@ -117,8 +116,11 @@ class ResourceMonitor {
    * Cleanup method (optional)
    */
   async destroy() {
-    this.framework.utils.Log('Resource Monitor module destroyed', 'info');
+    this.framework.log.info('Resource Monitor module destroyed');
   }
 }
 
 module.exports = ResourceMonitor;
+
+// Self-register
+global.Framework.register('resource-monitor', new ResourceMonitor(global.Framework), 1);

@@ -6,7 +6,7 @@
 class VehicleManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = framework.database;
+    this.db = null;
     this.logger = null;
     this.accessManager = null;
 
@@ -16,6 +16,7 @@ class VehicleManager {
 
   async init() {
     this.logger = this.framework.getModule('logger');
+    this.db = this.framework.getModule('database');
     this.accessManager = this.framework.getModule('access-manager');
 
     this.log('Vehicle manager initialized', 'info');
@@ -90,3 +91,6 @@ class VehicleManager {
 }
 
 module.exports = VehicleManager;
+
+// Self-register
+global.Framework.register('vehicle-manager', new VehicleManager(global.Framework), 17);

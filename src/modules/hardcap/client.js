@@ -8,7 +8,7 @@ setImmediate(() => {
   const checkSessionStarted = setInterval(() => {
     if (NetworkIsSessionStarted()) {
       // Session started, notify server
-      emitNet('hardcap:playerActivated');
+      global.Framework.fivem.emitNet('hardcap:playerActivated');
       clearInterval(checkSessionStarted);
       console.log('[NextGen] [Hardcap] Player session activated');
     }

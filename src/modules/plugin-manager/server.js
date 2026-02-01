@@ -20,10 +20,10 @@ class PluginManager {
    * This triggers Phase 3: Plugin loading
    */
   async init() {
-    this.framework.utils.Log('Plugin Manager module initialized', 'info');
+    this.framework.log.info('Plugin Manager module initialized');
 
     // PHASE 3: Load plugins (both internal and external)
-    this.framework.utils.Log('Phase 3: Loading Plugins...', 'info');
+    this.framework.log.info('Phase 3: Loading Plugins...');
 
     // Auto-load internal plugins from directories
     await this.autoLoad();
@@ -283,7 +283,7 @@ class PluginManager {
       this.pluginStates.set(resourceName, this.framework.constants.PluginState.LOADING);
 
       // Run before-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.BEFORE_PLUGIN_LOAD,
         resourceName,
         metadata
@@ -328,7 +328,7 @@ class PluginManager {
       global.NextGenUtils.Log(`External plugin "${resourceName}" loaded successfully (auto-detected)`, 'info');
 
       // Run after-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.AFTER_PLUGIN_LOAD,
         resourceName,
         pluginInstance
@@ -408,7 +408,7 @@ class PluginManager {
 
     try {
       // Run before-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.BEFORE_PLUGIN_LOAD,
         pluginName,
         options
@@ -455,7 +455,7 @@ class PluginManager {
       global.NextGenUtils.Log(`Plugin "${pluginName}" loaded successfully`, 'info');
 
       // Run after-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.AFTER_PLUGIN_LOAD,
         pluginName,
         pluginInstance
@@ -531,7 +531,7 @@ class PluginManager {
 
     try {
       // Run before-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.BEFORE_PLUGIN_LOAD,
         pluginName,
         {}
@@ -544,7 +544,7 @@ class PluginManager {
       global.NextGenUtils.Log(`External plugin "${pluginName}" registered successfully`, 'info');
 
       // Run after-load hook
-      await this.framework.runHook(
+      await this.framework.events.pipe(
         this.framework.constants.Hooks.AFTER_PLUGIN_LOAD,
         pluginName,
         pluginInstance
@@ -693,3 +693,6 @@ class PluginManager {
 }
 
 module.exports = PluginManager;
+
+// Self-register
+global.Framework.register('plugin-manager', new PluginManager(global.Framework), 2);

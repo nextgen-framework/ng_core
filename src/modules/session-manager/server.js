@@ -171,7 +171,7 @@ class SessionManager {
     this.log(`Created session: ${sessionId} (type: ${type}, host: ${host})`, 'info');
 
     // Emit event
-    emitNet('ng_core:session-created', host, sessionId, type);
+    this.framework.fivem.emitNet('ng_core:session-created', host, sessionId, type);
 
     return { success: true, sessionId, instanceId };
   }
@@ -247,7 +247,7 @@ class SessionManager {
     this.log(`Player ${source} joined session ${sessionId}`, 'debug');
 
     // Emit event
-    emitNet('ng_core:session-joined', source, sessionId, session.type);
+    this.framework.fivem.emitNet('ng_core:session-joined', source, sessionId, session.type);
     this.broadcastToSession(sessionId, 'ng_core:session-player-joined', source);
 
     return { success: true };
@@ -279,7 +279,7 @@ class SessionManager {
     this.log(`Player ${source} left session ${sessionId} (${reason})`, 'debug');
 
     // Emit event
-    emitNet('ng_core:session-left', source, sessionId, reason);
+    this.framework.fivem.emitNet('ng_core:session-left', source, sessionId, reason);
     this.broadcastToSession(sessionId, 'ng_core:session-player-left', source, reason);
 
     // Check if session should be ended
@@ -318,7 +318,7 @@ class SessionManager {
 
     this.log(`Player ${source} is now spectating session ${sessionId}`, 'debug');
 
-    emitNet('ng_core:session-spectating', source, sessionId);
+    this.framework.fivem.emitNet('ng_core:session-spectating', source, sessionId);
 
     return { success: true };
   }
@@ -336,7 +336,7 @@ class SessionManager {
           await this.instanceManager.removePlayerFromInstance(source);
         }
 
-        emitNet('ng_core:session-spectating-ended', source, sessionId);
+        this.framework.fivem.emitNet('ng_core:session-spectating-ended', source, sessionId);
         return { success: true };
       }
     }
@@ -435,11 +435,11 @@ class SessionManager {
     if (!session) return;
 
     for (const source of session.players) {
-      emitNet(eventName, source, ...args);
+      this.framework.fivem.emitNet(eventName, source, ...args);
     }
 
     for (const source of session.spectators) {
-      emitNet(eventName, source, ...args);
+      this.framework.fivem.emitNet(eventName, source, ...args);
     }
   }
 
@@ -512,7 +512,7 @@ class SessionManager {
     if (this.logger) {
       this.logger.log(message, level, metadata);
     } else {
-      this.framework.utils.Log(`[Session Manager] ${message}`, level);
+      this.framework.log[level](`[Session Manager] ${message}`);
     }
   }
 
@@ -533,3 +533,6 @@ class SessionManager {
 }
 
 module.exports = SessionManager;
+
+// Self-register
+global.Framework.register('session-manager', new SessionManager(global.Framework), 12);

@@ -48,15 +48,15 @@ class Database {
       if (oxmysqlExport && typeof oxmysqlExport === 'object') {
         this.backend = oxmysqlExport;
         this.backendType = 'oxmysql';
-        this.framework.utils.Log('oxmysql detected via global.exports["oxmysql"]', 'debug');
+        this.framework.log.debug('oxmysql detected via global.exports["oxmysql"]');
         return;
       }
     } catch (error) {
-      this.framework.utils.Log(`Error checking for oxmysql: ${error.message}`, 'warning');
+      this.framework.log.warn(`Error checking for oxmysql: ${error.message}`);
     }
 
     // Fallback: Memory storage
-    this.framework.utils.Log('oxmysql not detected, using memory storage', 'warning');
+    this.framework.log.warn('oxmysql not detected, using memory storage');
     this.backendType = 'memory';
     this.backend = { storage: new Map() };
   }
@@ -68,7 +68,7 @@ class Database {
     // Detect backend at init time (not constructor) so exports are available
     await this.detectBackend();
 
-    this.framework.utils.Log(`Database backend: ${this.backendType}`, 'info');
+    this.framework.log.info(`Database backend: ${this.backendType}`);
 
     switch (this.backendType) {
       case 'http-api':
@@ -80,12 +80,12 @@ class Database {
         break;
 
       case 'memory':
-        this.framework.utils.Log('Database using in-memory storage (no persistence)', 'warning');
+        this.framework.log.warn('Database using in-memory storage (no persistence)');
         this.connected = false;
         return;
 
       default:
-        this.framework.utils.Log('No database backend available', 'warning');
+        this.framework.log.warn('No database backend available');
         this.connected = false;
         return;
     }
@@ -104,12 +104,12 @@ class Database {
       const response = await this.httpRequest('GET', '/ping');
       if (response.ok) {
         this.connected = true;
-        this.framework.utils.Log(`Database connected via HTTP API (backend: ${response.data.backend})`, 'info');
+        this.framework.log.info(`Database connected via HTTP API (backend: ${response.data.backend})`);
       } else {
         throw new Error('API health check failed');
       }
     } catch (error) {
-      this.framework.utils.Log(`HTTP API connection failed: ${error.message} - Using fallback mode`, 'warning');
+      this.framework.log.warn(`HTTP API connection failed: ${error.message} - Using fallback mode`);
       this.connected = false;
     }
   }
@@ -121,9 +121,9 @@ class Database {
     try {
       await this.backend.query('SELECT 1');
       this.connected = true;
-      this.framework.utils.Log('Database connected via oxmysql (legacy, consider switching to HTTP API)', 'info');
+      this.framework.log.info('Database connected via oxmysql (legacy, consider switching to HTTP API)');
     } catch (error) {
-      this.framework.utils.Log(`oxmysql connection failed: ${error.message} - Using fallback mode`, 'warning');
+      this.framework.log.warn(`oxmysql connection failed: ${error.message} - Using fallback mode`);
       this.connected = false;
     }
   }
@@ -183,7 +183,7 @@ class Database {
       }
       throw new Error('Unsupported backend');
     } catch (error) {
-      this.framework.utils.Log(`Database query error: ${error.message}\nSQL: ${sql}`, 'error');
+      this.framework.log.error(`Database query error: ${error.message}\nSQL: ${sql}`);
       throw error;
     }
   }
@@ -217,7 +217,7 @@ class Database {
       }
       throw new Error('Unsupported backend');
     } catch (error) {
-      this.framework.utils.Log(`Database execute error: ${error.message}\nSQL: ${sql}`, 'error');
+      this.framework.log.error(`Database execute error: ${error.message}\nSQL: ${sql}`);
       throw error;
     }
   }
@@ -246,7 +246,7 @@ class Database {
     try {
       return await this.mysql.transaction(callback);
     } catch (error) {
-      this.framework.utils.Log(`Database transaction error: ${error.message}`, 'error');
+      this.framework.log.error(`Database transaction error: ${error.message}`);
       throw error;
     }
   }
@@ -264,7 +264,7 @@ class Database {
     try {
       return await this.mysql.prepare(sql);
     } catch (error) {
-      this.framework.utils.Log(`Database prepare error: ${error.message}`, 'error');
+      this.framework.log.error(`Database prepare error: ${error.message}`);
       throw error;
     }
   }
@@ -300,7 +300,7 @@ class Database {
   async dropCollection(name) {
     await this.execute(`DROP TABLE IF EXISTS \`${name}\``);
     this.collections.delete(name);
-    this.framework.utils.Log(`Collection '${name}' dropped`, 'info');
+    this.framework.log.info(`Collection '${name}' dropped`);
   }
 
   /**
@@ -334,10 +334,11 @@ class Database {
     // Load migration files
     const fs = require('fs');
     const path = require('path');
-    const migrationsDir = path.join(__dirname, 'migrations');
+    const resourcePath = GetResourcePath(GetCurrentResourceName());
+    const migrationsDir = path.join(resourcePath, 'src', 'migrations');
 
     if (!fs.existsSync(migrationsDir)) {
-      this.framework.utils.Log('No migrations directory found', 'debug');
+      this.framework.log.debug('No migrations directory found');
       return;
     }
 
@@ -391,17 +392,17 @@ class Database {
           [version, file]
         );
 
-        this.framework.utils.Log(`Migration '${file}' executed`, 'info');
+        this.framework.log.info(`Migration '${file}' executed`);
         migrationsRun++;
       } catch (error) {
-        this.framework.utils.Log(`Migration '${file}' failed: ${error.message}`, 'error');
+        this.framework.log.error(`Migration '${file}' failed: ${error.message}`);
         // Don't throw error to allow server to continue starting even if migrations fail
-        this.framework.utils.Log('Continuing server startup despite migration error...', 'warning');
+        this.framework.log.warn('Continuing server startup despite migration error...');
       }
     }
 
     if (migrationsRun > 0) {
-      this.framework.utils.Log(`Executed ${migrationsRun} database migrations`, 'success');
+      this.framework.log.success(`Executed ${migrationsRun} database migrations`);
     }
   }
 
@@ -426,3 +427,6 @@ class Database {
 }
 
 module.exports = Database;
+
+// Self-register
+global.Framework.register('database', new Database(global.Framework), 0);
