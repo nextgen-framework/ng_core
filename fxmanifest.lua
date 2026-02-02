@@ -41,12 +41,6 @@ client_scripts {
     'src/client/exports.js'
 }
 
--- Exports
-exports {
-    'GetFramework',
-    'GetConfig'
-}
-
 server_exports {
     'GetFramework',
     'IsReady',
