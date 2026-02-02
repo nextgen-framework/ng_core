@@ -33,12 +33,12 @@ class MoneyManager {
     this.playerManager = this.framework.getModule('player-manager');
 
     // Handle player joining
-    on('playerJoining', async () => {
+    this.framework.fivem.on('playerJoining', async () => {
       await this.loadPlayerMoney(source);
     });
 
     // Handle player dropping
-    on('playerDropped', async () => {
+    this.framework.fivem.on('playerDropped', async () => {
       await this.savePlayerMoney(source);
       this.playerMoney.delete(source);
     });

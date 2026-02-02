@@ -191,10 +191,7 @@ class CharacterAppearanceClient {
   }
 }
 
-// Export to global scope for framework (FiveM client environment)
-if (typeof global !== 'undefined') {
-  global.NgModule_character_appearance = CharacterAppearanceClient;
-}
+module.exports = CharacterAppearanceClient;
 
 // Self-register
 global.Framework.register('character-appearance', new CharacterAppearanceClient(global.Framework), 15);

@@ -197,8 +197,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = NotificationModule;
 }
 
-// Export to global scope for framework (FiveM client environment)
-global.NgModule_notifications = NotificationModule;
-
 // Self-register
 global.Framework.register('notifications', new NotificationModule(global.Framework), 15);

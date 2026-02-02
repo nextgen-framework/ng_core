@@ -365,7 +365,5 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = TickManager;
 }
 
-global.NgModule_tick_manager = TickManager;
-
 // Self-register
 global.Framework.register('tick-manager', new TickManager(global.Framework), 3);

@@ -33,12 +33,12 @@ class PerformanceModule {
     });
 
     // Start performance tracking
-    setInterval(() => {
+    this._perfInterval = setInterval(() => {
       this.updatePerformance();
     }, 1000);
 
     // Draw overlay
-    setTick(() => {
+    this._overlayTick = setTick(() => {
       if (this.showOverlay) {
         this.drawOverlay();
       }
@@ -147,8 +147,16 @@ class PerformanceModule {
    * Cleanup
    */
   async destroy() {
-    this.framework.log.info('Performance Monitor Module destroyed');
+    if (this._perfInterval) {
+      clearInterval(this._perfInterval);
+      this._perfInterval = null;
+    }
+    if (this._overlayTick) {
+      clearTick(this._overlayTick);
+      this._overlayTick = null;
+    }
     this.showOverlay = false;
+    this.framework.log.info('Performance Monitor Module destroyed');
   }
 }
 
@@ -156,9 +164,6 @@ class PerformanceModule {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = PerformanceModule;
 }
-
-// Export to global scope for framework (FiveM client environment)
-global.NgModule_performance = PerformanceModule;
 
 // Self-register
 global.Framework.register('performance', new PerformanceModule(global.Framework), 20);

@@ -68,14 +68,14 @@ class SpawnManager {
     await this.loadSpawnPoints();
 
     // Handle player spawn
-    on('playerJoining', () => {
+    this.framework.fivem.on('playerJoining', () => {
       // Capture source before setTimeout to avoid scope issues
       const playerSource = source;
       setTimeout(() => this.handlePlayerSpawn(playerSource), 1000);
     });
 
     // Save last position on disconnect
-    on('playerDropped', () => {
+    this.framework.fivem.on('playerDropped', () => {
       const playerSource = source;
       this.saveLastPosition(playerSource);
     });

@@ -11,8 +11,6 @@ class ContainerManager {
 
     // Container cache
     this.containers = new Map(); // containerId => Container object
-    this.playerContainers = new Map(); // source => containerId (main inventory)
-
     // Configuration
     this.config = {
       defaultPlayerSlots: 30,
@@ -633,7 +631,6 @@ class ContainerManager {
     this.stopAutoSave();
     await this.saveAllContainers();
     this.containers.clear();
-    this.playerContainers.clear();
     this.framework.log.info('Container manager module destroyed');
   }
 }

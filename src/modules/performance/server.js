@@ -14,6 +14,7 @@ class PerformanceModule {
       resourceCount: 0
     };
     this.startTime = Date.now();
+    this._statsInterval = null;
   }
 
   /**
@@ -23,7 +24,7 @@ class PerformanceModule {
     this.framework.log.info('Performance Monitor Module initialized');
 
     // Update stats every 5 seconds
-    setInterval(() => {
+    this._statsInterval = setInterval(() => {
       this.updateStats();
     }, 5000);
 
@@ -180,6 +181,10 @@ class PerformanceModule {
    * Cleanup
    */
   async destroy() {
+    if (this._statsInterval) {
+      clearInterval(this._statsInterval);
+      this._statsInterval = null;
+    }
     this.framework.log.info('Performance Monitor Module destroyed');
   }
 }

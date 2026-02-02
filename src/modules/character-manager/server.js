@@ -42,7 +42,7 @@ class CharacterManager {
     }
 
     // Handle player drop
-    on('playerDropped', () => {
+    this.framework.fivem.on('playerDropped', () => {
       this.activeCharacters.delete(source);
     });
 
