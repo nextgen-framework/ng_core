@@ -74,8 +74,7 @@ class SyncManager {
     this.startSync();
 
     // Handle player connecting
-    on('playerJoining', () => {
-      // Note: 'source' is a magic global variable in FiveM event handlers
+    this.framework.fivem.on('playerJoining', () => {
       this.syncToPlayer(source);
     });
 
@@ -137,8 +136,8 @@ class SyncManager {
    * Set game time
    */
   setTime(hour, minute, transition = false) {
-    this.state.time.hour = hour;
-    this.state.time.minute = minute;
+    this.state.time.hour = Math.max(0, Math.min(23, Math.floor(hour) || 0));
+    this.state.time.minute = Math.max(0, Math.min(59, Math.floor(minute) || 0));
     this.state.time.second = 0;
 
     this.syncTimeToAll(transition);
@@ -295,7 +294,9 @@ class SyncManager {
    * Set traffic density (0.0 - 1.0)
    */
   setTrafficDensity(density) {
-    this.state.trafficDensity = Math.max(0, Math.min(1, density));
+    const val = Number(density);
+    if (Number.isNaN(val)) return;
+    this.state.trafficDensity = Math.max(0, Math.min(1, val));
     this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
     this.framework.log.info(`Traffic density set to ${this.state.trafficDensity}`);
   }
@@ -304,7 +305,9 @@ class SyncManager {
    * Set pedestrian density (0.0 - 1.0)
    */
   setPedestrianDensity(density) {
-    this.state.pedestrianDensity = Math.max(0, Math.min(1, density));
+    const val = Number(density);
+    if (Number.isNaN(val)) return;
+    this.state.pedestrianDensity = Math.max(0, Math.min(1, val));
     this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
     this.framework.log.info(`Pedestrian density set to ${this.state.pedestrianDensity}`);
   }
@@ -388,7 +391,7 @@ class SyncManager {
   async loadState() {
     try {
       const db = this.framework.getModule('database');
-      if (!db) return;
+      if (!db || !db.isConnected()) return;
 
       const saved = await db.query('SELECT * FROM world_state WHERE id = 1');
 
@@ -412,7 +415,7 @@ class SyncManager {
   async saveState() {
     try {
       const db = this.framework.getModule('database');
-      if (!db) return;
+      if (!db || !db.isConnected()) return;
 
       await db.execute(
         'INSERT INTO world_state (id, time_hour, time_minute, weather, blackout, updated_at) ' +

@@ -4,97 +4,121 @@
  */
 
 class SyncManagerClient {
-  constructor(framework) {
-    this.framework = framework;
-  }
-
-  /**
-   * Initialize sync manager client
-   */
-  init() {
-    // Listen for time updates
-    this.framework.onNet('ng_core:time-set', this.onTimeSet.bind(this));
-
-    // Listen for weather updates
-    this.framework.onNet('ng_core:weather-set', this.onWeatherSet.bind(this));
-    this.framework.onNet('ng_core:weather-transition', this.onWeatherTransition.bind(this));
-
-    // Listen for blackout updates
-    this.framework.onNet('ng_core:blackout-set', this.onBlackoutSet.bind(this));
-
-    // Listen for density updates
-    this.framework.onNet('ng_core:traffic-density-set', this.onTrafficDensitySet.bind(this));
-    this.framework.onNet('ng_core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
-
-    console.log('[Sync Manager] Client initialized');
-  }
-
-  /**
-   * Handle time set event
-   */
-  onTimeSet(hour, minute, second, frozen, transition) {
-    if (transition) {
-      // Smooth transition to new time
-      NetworkOverrideClockTime(hour, minute, second);
-    } else {
-      // Instant time change
-      NetworkOverrideClockTime(hour, minute, second);
+    constructor(framework) {
+        this.framework = framework;
+        this.trafficDensity = 1.0;
+        this.pedestrianDensity = 1.0;
+        this._densityTick = null;
     }
 
-    if (frozen) {
-      PauseClock(true);
-    } else {
-      PauseClock(false);
+    /**
+     * Initialize sync manager client
+     */
+    init() {
+        // Listen for time updates
+        this.framework.onNet('ng_core:time-set', this.onTimeSet.bind(this));
+
+        // Listen for weather updates
+        this.framework.onNet('ng_core:weather-set', this.onWeatherSet.bind(this));
+        this.framework.onNet('ng_core:weather-transition', this.onWeatherTransition.bind(this));
+
+        // Listen for blackout updates
+        this.framework.onNet('ng_core:blackout-set', this.onBlackoutSet.bind(this));
+
+        // Listen for density updates
+        this.framework.onNet('ng_core:traffic-density-set', this.onTrafficDensitySet.bind(this));
+        this.framework.onNet('ng_core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
+
+        console.log('[SyncManager] Client initialized');
     }
-  }
 
-  /**
-   * Handle weather set event
-   */
-  onWeatherSet(weatherType) {
-    SetWeatherTypeNow(weatherType);
-    SetWeatherTypePersist(weatherType);
-  }
+    /**
+     * Handle time set event
+     * @param {number} hour
+     * @param {number} minute
+     * @param {number} second
+     * @param {boolean} frozen
+     */
+    onTimeSet(hour, minute, second, frozen) {
+        NetworkOverrideClockTime(hour, minute, second);
+        PauseClock(frozen);
+    }
 
-  /**
-   * Handle weather transition event
-   */
-  onWeatherTransition(weatherType, duration) {
-    SetWeatherTypeOverTime(weatherType, duration / 1000);
+    /**
+     * Handle weather set event
+     * @param {string} weatherType
+     */
+    onWeatherSet(weatherType) {
+        SetWeatherTypeNow(weatherType);
+        SetWeatherTypePersist(weatherType);
+    }
 
-    setTimeout(() => {
-      SetWeatherTypePersist(weatherType);
-    }, duration);
-  }
+    /**
+     * Handle weather transition event
+     * @param {string} weatherType
+     * @param {number} duration - Duration in milliseconds
+     */
+    onWeatherTransition(weatherType, duration) {
+        SetWeatherTypeOverTime(weatherType, duration / 1000);
 
-  /**
-   * Handle blackout event
-   */
-  onBlackoutSet(enabled) {
-    SetArtificialLightsState(enabled);
-    SetArtificialLightsStateAffectsVehicles(false); // Don't affect vehicle lights
-  }
+        setTimeout(() => {
+            SetWeatherTypePersist(weatherType);
+        }, duration);
+    }
 
-  /**
-   * Handle traffic density event
-   */
-  onTrafficDensitySet(density) {
-    SetVehicleDensityMultiplierThisFrame(density);
-    SetRandomVehicleDensityMultiplierThisFrame(density);
-    SetParkedVehicleDensityMultiplierThisFrame(density);
-  }
+    /**
+     * Handle blackout event
+     * @param {boolean} enabled
+     */
+    onBlackoutSet(enabled) {
+        SetArtificialLightsState(enabled);
+        SetArtificialLightsStateAffectsVehicles(false);
+    }
 
-  /**
-   * Handle pedestrian density event
-   */
-  onPedestrianDensitySet(density) {
-    SetPedDensityMultiplierThisFrame(density);
-    SetScenarioPedDensityMultiplierThisFrame(density, density);
-  }
+    /**
+     * Handle traffic density event
+     * @param {number} density - 0.0 to 1.0
+     */
+    onTrafficDensitySet(density) {
+        this.trafficDensity = density;
+        this._ensureDensityTick();
+    }
+
+    /**
+     * Handle pedestrian density event
+     * @param {number} density - 0.0 to 1.0
+     */
+    onPedestrianDensitySet(density) {
+        this.pedestrianDensity = density;
+        this._ensureDensityTick();
+    }
+
+    /**
+     * Start density tick if needed (ThisFrame natives must run every frame)
+     */
+    _ensureDensityTick() {
+        if (this._densityTick) return;
+
+        this._densityTick = setTick(() => {
+            // Traffic
+            SetVehicleDensityMultiplierThisFrame(this.trafficDensity);
+            SetRandomVehicleDensityMultiplierThisFrame(this.trafficDensity);
+            SetParkedVehicleDensityMultiplierThisFrame(this.trafficDensity);
+
+            // Pedestrians
+            SetPedDensityMultiplierThisFrame(this.pedestrianDensity);
+            SetScenarioPedDensityMultiplierThisFrame(this.pedestrianDensity, this.pedestrianDensity);
+
+            // Stop tick when both are back to default
+            if (this.trafficDensity === 1.0 && this.pedestrianDensity === 1.0) {
+                clearTick(this._densityTick);
+                this._densityTick = null;
+            }
+        });
+    }
 }
 
-// Export to global scope for framework (FiveM client environment)
-if (typeof global !== "undefined") { global.NgModule_sync_manager = SyncManagerClient; }
+module.exports = SyncManagerClient;
 
 // Self-register
 global.Framework.register('sync-manager', new SyncManagerClient(global.Framework), 11);
