@@ -7,7 +7,10 @@ const fw = global.Framework;
 
 // Core exports (manual - not module methods)
 exports('GetFramework', () => fw);
+exports('IsReady', () => fw.isReady());
+exports('GetVersion', () => GetResourceMetadata(GetCurrentResourceName(), 'version', 0) || '0.0.0');
 exports('GetModule', (name) => fw.getModule(name));
+exports('GetModuleList', () => fw.list());
 
 // RPC
 fw.expose('rpc', {
