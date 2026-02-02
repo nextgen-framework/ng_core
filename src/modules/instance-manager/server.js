@@ -25,27 +25,39 @@ class InstanceManager {
     // Bucket allocation
     this.nextBucket = 1; // Start from 1 (0 is public)
     this.freeBuckets = []; // Recycled buckets
+
+    // Server-side invitation tracking (prevent unauthorized joins)
+    this._pendingInvites = new Map(); // source => Set<instanceId>
   }
 
   /**
    * Initialize instance manager module
    */
   async init() {
+    // Reset all players to public bucket on resource restart (prevent limbo)
+    const players = getPlayers();
+    for (const playerId of players) {
+      SetPlayerRoutingBucket(parseInt(playerId), this.config.defaultBucket);
+    }
+
     // Handle player drops
     this.framework.fivem.on('playerDropped', () => {
-      this.handlePlayerLeft(source);
+      this._handlePlayerDropped(source);
     });
 
-    // Handle client-initiated actions
-    this.framework.onNet('ng_core:instance-request-join', (instanceId) => {
-      this.addPlayerToInstance(source, instanceId);
-    });
-
+    // Handle client-initiated actions (with server-side validation)
     this.framework.onNet('ng_core:instance-request-leave', () => {
       this.removePlayerFromInstance(source);
     });
 
     this.framework.onNet('ng_core:instance-accept-invite', (instanceId) => {
+      // Validate invitation exists server-side
+      const invites = this._pendingInvites.get(source);
+      if (!invites || !invites.has(instanceId)) {
+        this.framework.log.warn(`Player ${source} tried to accept invalid invite for ${instanceId}`);
+        return;
+      }
+      invites.delete(instanceId);
       this.addPlayerToInstance(source, instanceId);
     });
 
@@ -147,6 +159,12 @@ class InstanceManager {
       await this.removePlayerFromInstance(source);
     }
 
+    // Cancel pending cleanup for this instance
+    if (instance._cleanupTimer) {
+      clearTimeout(instance._cleanupTimer);
+      instance._cleanupTimer = null;
+    }
+
     // Add to new instance
     instance.players.add(source);
     this.playerInstances.set(source, instanceId);
@@ -164,8 +182,10 @@ class InstanceManager {
 
   /**
    * Remove player from instance
+   * @param {number} source - Player source
+   * @param {boolean} [silent=false] - Skip emitNet (used when player already disconnected)
    */
-  async removePlayerFromInstance(source) {
+  async removePlayerFromInstance(source, silent = false) {
     const instanceId = this.playerInstances.get(source);
 
     if (!instanceId) {
@@ -177,7 +197,7 @@ class InstanceManager {
     if (!instance) {
       // Instance was deleted, just clean up player tracking
       this.playerInstances.delete(source);
-      SetPlayerRoutingBucket(source, this.config.defaultBucket);
+      if (!silent) SetPlayerRoutingBucket(source, this.config.defaultBucket);
       return { success: true };
     }
 
@@ -185,17 +205,17 @@ class InstanceManager {
     instance.players.delete(source);
     this.playerInstances.delete(source);
 
-    // Return to public world
-    SetPlayerRoutingBucket(source, this.config.defaultBucket);
+    // Return to public world (skip if player already disconnected)
+    if (!silent) {
+      SetPlayerRoutingBucket(source, this.config.defaultBucket);
+      this.framework.fivem.emitNet('ng_core:instance-left', source, instanceId);
+    }
 
     this.framework.log.debug(`Player ${source} left instance ${instanceId}`);
 
-    // Emit event
-    this.framework.fivem.emitNet('ng_core:instance-left', source, instanceId);
-
     // Auto cleanup if empty
     if (this.config.autoCleanupEmpty && instance.players.size === 0) {
-      this.scheduleCleanupCheck(instanceId);
+      this._scheduleCleanup(instance);
     }
 
     return { success: true };
@@ -310,6 +330,12 @@ class InstanceManager {
       return { success: false, reason: 'instance_not_found' };
     }
 
+    // Track invitation server-side
+    if (!this._pendingInvites.has(source)) {
+      this._pendingInvites.set(source, new Set());
+    }
+    this._pendingInvites.get(source).add(instanceId);
+
     // Send invitation to client
     this.framework.fivem.emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
 
@@ -351,27 +377,32 @@ class InstanceManager {
   }
 
   /**
-   * Schedule cleanup check for empty instance
+   * Schedule cleanup for empty instance (stores ref to prevent accumulation)
+   * @param {Object} instance - Instance object
    */
-  scheduleCleanupCheck(instanceId) {
-    setTimeout(() => {
-      const instance = this.instances.get(instanceId);
+  _scheduleCleanup(instance) {
+    if (instance._cleanupTimer) {
+      clearTimeout(instance._cleanupTimer);
+    }
 
-      if (instance && instance.players.size === 0) {
-        this.framework.log.debug(`Auto-cleaning empty instance: ${instanceId}`);
-        this.deleteInstance(instanceId);
+    instance._cleanupTimer = setTimeout(() => {
+      instance._cleanupTimer = null;
+      if (instance.players.size === 0) {
+        this.framework.log.debug(`Auto-cleaning empty instance: ${instance.id}`);
+        this.deleteInstance(instance.id);
       }
     }, this.config.autoCleanupDelay);
   }
 
   /**
-   * Handle player leaving server
+   * Handle player leaving server (silent: don't emitNet to disconnected player)
    */
-  handlePlayerLeft(source) {
-    const instanceId = this.playerInstances.get(source);
+  _handlePlayerDropped(source) {
+    this._pendingInvites.delete(source);
 
+    const instanceId = this.playerInstances.get(source);
     if (instanceId) {
-      this.removePlayerFromInstance(source);
+      this.removePlayerFromInstance(source, true);
     }
   }
 
@@ -399,7 +430,7 @@ class InstanceManager {
    * Free routing bucket for reuse
    */
   freeBucket(bucket) {
-    if (bucket > 0) { // Don't free bucket 0 (public)
+    if (bucket !== this.config.defaultBucket) {
       this.freeBuckets.push(bucket);
     }
   }
