@@ -427,10 +427,6 @@ class TargetManager {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  log(message, level = 'info') {
-    console.log(`[Target] ${message}`);
-  }
-
   async destroy() {
     this.stopRaycastThread();
     this.clearTarget();
