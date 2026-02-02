@@ -35,8 +35,28 @@ class SessionManager {
     this.instanceManager = this.framework.getModule('instance-manager');
 
     // Handle player drops
-    on('playerDropped', () => {
+    this.framework.fivem.on('playerDropped', () => {
       this.handlePlayerLeft(source);
+    });
+
+    // Handle client-initiated actions
+    this.framework.onNet('ng_core:session-create', (type, options) => {
+      this.createSession(type, source, options);
+    });
+
+    this.framework.onNet('ng_core:session-join', (sessionId) => {
+      this.addPlayerToSession(source, sessionId);
+    });
+
+    this.framework.onNet('ng_core:session-leave', () => {
+      this.removePlayerFromSession(source);
+    });
+
+    this.framework.onNet('ng_core:session-start', () => {
+      const session = this.getPlayerSession(source);
+      if (session && session.host === source) {
+        this.startSession(session.id);
+      }
     });
 
     this.framework.log.info('Session manager module initialized');
@@ -183,13 +203,13 @@ class SessionManager {
       return { success: false, reason: 'session_not_found' };
     }
 
-    // Remove all players
-    for (const source of session.players) {
+    // Remove all players (copy Set to avoid modification during iteration)
+    for (const source of [...session.players]) {
       await this.removePlayerFromSession(source, reason);
     }
 
-    // Remove all spectators
-    for (const source of session.spectators) {
+    // Remove all spectators (copy Set to avoid modification during iteration)
+    for (const source of [...session.spectators]) {
       await this.removeSpectatorFromSession(source);
     }
 
@@ -253,8 +273,11 @@ class SessionManager {
 
   /**
    * Remove player from session
+   * @param {number} source - Player source
+   * @param {string} [reason='left'] - Reason for leaving
+   * @param {boolean} [silent=false] - Skip emitNet to source (used when player already disconnected)
    */
-  async removePlayerFromSession(source, reason = 'left') {
+  async removePlayerFromSession(source, reason = 'left', silent = false) {
     const sessionId = this.playerSessions.get(source);
     if (!sessionId) {
       return { success: false, reason: 'not_in_session' };
@@ -269,15 +292,17 @@ class SessionManager {
     session.players.delete(source);
     this.playerSessions.delete(source);
 
-    // Remove from instance
+    // Remove from instance (instance-manager handles silent internally)
     if (session.instanceId && this.instanceManager) {
-      await this.instanceManager.removePlayerFromInstance(source);
+      await this.instanceManager.removePlayerFromInstance(source, silent);
     }
 
     this.framework.log.debug(`Player ${source} left session ${sessionId} (${reason})`);
 
-    // Emit event
-    this.framework.fivem.emitNet('ng_core:session-left', source, sessionId, reason);
+    // Emit event (skip direct emitNet if player already disconnected)
+    if (!silent) {
+      this.framework.fivem.emitNet('ng_core:session-left', source, sessionId, reason);
+    }
     this.broadcastToSession(sessionId, 'ng_core:session-player-left', source, reason);
 
     // Check if session should be ended
@@ -323,18 +348,22 @@ class SessionManager {
 
   /**
    * Remove spectator from session
+   * @param {number} source - Player source
+   * @param {boolean} [silent=false] - Skip emitNet to source (used when player already disconnected)
    */
-  async removeSpectatorFromSession(source) {
+  async removeSpectatorFromSession(source, silent = false) {
     for (const [sessionId, session] of this.sessions.entries()) {
       if (session.spectators.has(source)) {
         session.spectators.delete(source);
 
-        // Remove from instance
+        // Remove from instance (instance-manager handles silent internally)
         if (session.instanceId && this.instanceManager) {
-          await this.instanceManager.removePlayerFromInstance(source);
+          await this.instanceManager.removePlayerFromInstance(source, silent);
         }
 
-        this.framework.fivem.emitNet('ng_core:session-spectating-ended', source, sessionId);
+        if (!silent) {
+          this.framework.fivem.emitNet('ng_core:session-spectating-ended', source, sessionId);
+        }
         return { success: true };
       }
     }
@@ -460,15 +489,15 @@ class SessionManager {
    * Handle player leaving server
    */
   handlePlayerLeft(source) {
-    this.removePlayerFromSession(source, 'disconnected');
-    this.removeSpectatorFromSession(source);
+    this.removePlayerFromSession(source, 'disconnected', true);
+    this.removeSpectatorFromSession(source, true);
   }
 
   /**
    * Generate unique session ID
    */
   generateSessionId() {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -508,8 +537,8 @@ class SessionManager {
    * Cleanup
    */
   async destroy() {
-    // End all sessions
-    for (const sessionId of this.sessions.keys()) {
+    // End all sessions (copy keys to avoid modification during iteration)
+    for (const sessionId of [...this.sessions.keys()]) {
       await this.deleteSession(sessionId, 'shutdown');
     }
 
