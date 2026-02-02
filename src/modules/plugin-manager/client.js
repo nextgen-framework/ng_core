@@ -63,8 +63,8 @@ class PluginManager {
       }
     });
 
-    // Scan already started resources for plugins
-    setImmediate(async () => {
+    // Wait for all resources to be loaded before scanning
+    this.framework.eventBus.on(this.framework.constants.Events.ALL_RESOURCES_LOADED, async () => {
       await this.scanExistingResources();
     });
 
