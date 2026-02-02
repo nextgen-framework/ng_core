@@ -278,6 +278,12 @@ class PluginManager {
    * @param {Object} metadata - Plugin metadata
    */
   async loadExternalPlugin(resourceName, pluginPath, metadata = {}) {
+    // Skip if plugin already self-registered via Bridge
+    if (this.plugins.has(resourceName)) {
+      this.framework.log.info(`Plugin "${resourceName}" already registered (self-init)`);
+      return;
+    }
+
     try {
       this.pluginStates.set(resourceName, this.framework.constants.PluginState.LOADING);
 

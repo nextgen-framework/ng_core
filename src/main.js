@@ -350,4 +350,21 @@ exports('GetFramework', () => Framework);
 exports('IsReady', () => Framework.isReady());
 const _version = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) || '0.0.0';
 exports('GetVersion', () => _version);
+exports('GetModule', (name) => Framework.getModule(name));
 exports('GetModuleList', () => Framework.list());
+
+// Generic cross-resource method proxies (avoids serialization)
+exports('CallModule', (moduleName, method, ...args) => {
+    const mod = Framework.getModule(moduleName);
+    if (!mod) throw new Error(`Module "${moduleName}" not loaded`);
+    if (typeof mod[method] !== 'function') throw new Error(`Module "${moduleName}" has no method "${method}"`);
+    return mod[method](...args);
+});
+exports('CallPlugin', (pluginName, method, ...args) => {
+    const pm = Framework.getModule('plugin-manager');
+    if (!pm) throw new Error('Plugin-manager module not loaded');
+    const plugin = pm.plugins?.get(pluginName);
+    if (!plugin) throw new Error(`Plugin "${pluginName}" not loaded`);
+    if (typeof plugin[method] !== 'function') throw new Error(`Plugin "${pluginName}" has no method "${method}"`);
+    return plugin[method](...args);
+});

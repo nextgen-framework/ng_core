@@ -69,7 +69,9 @@ server_exports {
     'Queue_GetInfo',
     'Queue_SetDynamicPriority',
     'Queue_SetDynamicType',
-    'Queue_RemoveDynamic'
+    'Queue_RemoveDynamic',
+    'CallModule',
+    'CallPlugin'
 }
 
 client_exports {

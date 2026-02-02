@@ -5,9 +5,7 @@
 
 const fw = global.Framework;
 
-// Core exports (manual - not module methods)
-exports('GetFramework', () => fw);
-exports('GetModule', (name) => fw.getModule(name));
+// Note: GetFramework, GetModule, CallModule, CallPlugin are in main.js (kernel)
 
 // Chat commands
 fw.expose('chat-commands', {
