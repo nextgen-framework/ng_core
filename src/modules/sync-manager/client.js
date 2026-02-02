@@ -29,6 +29,9 @@ class SyncManagerClient {
         this.framework.onNet('ng_core:traffic-density-set', this.onTrafficDensitySet.bind(this));
         this.framework.onNet('ng_core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
 
+        // Request full sync from server (client is ready)
+        this.framework.emitNet('ng_core:request-sync');
+
         console.log('[SyncManager] Client initialized');
     }
 
@@ -72,7 +75,7 @@ class SyncManagerClient {
      */
     onBlackoutSet(enabled) {
         SetArtificialLightsState(enabled);
-        SetArtificialLightsStateAffectsVehicles(false);
+        SetArtificialLightsStateAffectsVehicles(!enabled);
     }
 
     /**

@@ -50,6 +50,8 @@ class SyncManager {
     this.timeTimer = null;
     this.weatherTimer = null;
     this.syncTimer = null;
+    this.saveTimer = null;
+    this._weatherTransitionTimeout = null;
   }
 
   /**
@@ -73,8 +75,11 @@ class SyncManager {
     // Start sync to clients
     this.startSync();
 
-    // Handle player connecting
-    this.framework.fivem.on('playerJoining', () => {
+    // Start periodic autosave (every 5 minutes)
+    this.saveTimer = setInterval(() => this.saveState(), 300000);
+
+    // Handle client requesting sync (client fires this when ready)
+    this.framework.onNet('ng_core:request-sync', () => {
       this.syncToPlayer(source);
     });
 
@@ -221,15 +226,22 @@ class SyncManager {
     }
 
     if (transition) {
+      // Cancel any pending transition
+      if (this._weatherTransitionTimeout) {
+        clearTimeout(this._weatherTransitionTimeout);
+        this._weatherTransitionTimeout = null;
+      }
+
       this.state.weather.transition = weatherType;
 
       // Sync transition to all clients
       this.framework.fivem.emitNet('ng_core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
 
-      // Update current weather after transition
-      setTimeout(() => {
+      // Update current weather after transition completes
+      this._weatherTransitionTimeout = setTimeout(() => {
         this.state.weather.current = weatherType;
         this.state.weather.transition = null;
+        this._weatherTransitionTimeout = null;
       }, this.state.weather.transitionDuration);
 
       this.framework.log.debug(`Weather transitioning to ${weatherType}`);
@@ -448,19 +460,30 @@ class SyncManager {
    */
   configure(config) {
     if (config.time) {
+      // Prevent dangerous values
+      if (config.time.syncInterval !== undefined) {
+        config.time.syncInterval = Math.max(5000, Number(config.time.syncInterval) || 60000);
+      }
       this.state.time = { ...this.state.time, ...config.time };
     }
     if (config.weather) {
+      // Prevent CPU flood from cycleDuration=0
+      if (config.weather.cycleDuration !== undefined) {
+        config.weather.cycleDuration = Math.max(10000, Number(config.weather.cycleDuration) || 600000);
+      }
+      if (config.weather.transitionDuration !== undefined) {
+        config.weather.transitionDuration = Math.max(1000, Number(config.weather.transitionDuration) || 45000);
+      }
       this.state.weather = { ...this.state.weather, ...config.weather };
     }
     if (config.blackout !== undefined) {
-      this.state.blackout = config.blackout;
+      this.state.blackout = !!config.blackout;
     }
     if (config.trafficDensity !== undefined) {
-      this.state.trafficDensity = config.trafficDensity;
+      this.state.trafficDensity = Math.max(0, Math.min(1, Number(config.trafficDensity) || 1));
     }
     if (config.pedestrianDensity !== undefined) {
-      this.state.pedestrianDensity = config.pedestrianDensity;
+      this.state.pedestrianDensity = Math.max(0, Math.min(1, Number(config.pedestrianDensity) || 1));
     }
 
     this.framework.log.info('Sync manager configuration updated');
@@ -487,6 +510,14 @@ class SyncManager {
     this.stopTime();
     this.stopWeatherCycle();
     this.stopSync();
+    if (this.saveTimer) {
+      clearInterval(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (this._weatherTransitionTimeout) {
+      clearTimeout(this._weatherTransitionTimeout);
+      this._weatherTransitionTimeout = null;
+    }
     await this.saveState();
     this.framework.log.info('Sync manager module destroyed');
   }
