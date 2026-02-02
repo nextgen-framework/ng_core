@@ -2,13 +2,11 @@
  * NextGen Kernel - Bridge
  *
  * Include via @ng_core/bridge.js in plugin fxmanifest (shared_scripts).
- * Runs in the plugin's context. Works on both server and client.
+ * Shares ng_core's context — global.Framework is directly available.
  * Safe to include multiple times (idempotent).
  *
- * Auto-detects the kernel resource via ng_kernel_resource convar.
- *
  * Provides:
- *   - global.Framework                        : kernel data (lazy getter, no methods)
+ *   - global.Framework                        : kernel instance (direct access)
  *   - global.Bridge.ready()                   : wait for kernel to be ready
  *   - global.Bridge.expose(target, mappings)  : register FiveM exports for this resource
  *   - global.Bridge.use(resource)             : proxy to another resource's exports
@@ -20,55 +18,34 @@ if (!global.Bridge) {
     const _kernelResource = GetConvar('ng_kernel_resource', 'ng_core');
     const _resourceName = GetCurrentResourceName();
     const _tag = `[Bridge:${_resourceName}]`;
-    let _fw = null;
 
     // Proxy cache (avoids creating a new Proxy on every call)
     const _cache = new Map();
 
-    Object.defineProperty(global, 'Framework', {
-        get() {
-            if (!_fw) {
-                try {
-                    _fw = exports[_kernelResource].GetFramework();
-                } catch (e) {
-                    console.error(`${_tag} Failed to get Framework: ${e.message}`);
-                }
-            }
-            return _fw;
-        },
-        configurable: true
-    });
-
     global.Bridge = {
         /**
          * Wait for kernel framework to be ready
-         * @returns {Promise<Object>} Framework data (no methods - use Bridge.module() for RPC)
+         * @returns {Promise<Object>} Framework instance
          */
         ready() {
             return new Promise((resolve, reject) => {
-                try {
-                    if (exports[_kernelResource].IsReady()) {
-                        _fw = exports[_kernelResource].GetFramework();
-                        resolve(_fw);
-                        return;
-                    }
-                } catch (e) {
-                    console.warn(`${_tag} Kernel not available yet, polling...`);
+                // Fast path: already ready
+                const fw = global.Framework;
+                if (fw && typeof fw.isReady === 'function' && fw.isReady()) {
+                    resolve(fw);
+                    return;
                 }
 
+                // Poll direct global.Framework access
                 let attempts = 0;
                 const check = () => {
-                    try {
-                        if (exports[_kernelResource].IsReady()) {
-                            _fw = exports[_kernelResource].GetFramework();
-                            resolve(_fw);
-                            return;
-                        }
-                    } catch (e) {
-                        // Kernel not started yet, keep polling
+                    const fw = global.Framework;
+                    if (fw && typeof fw.isReady === 'function' && fw.isReady()) {
+                        resolve(fw);
+                        return;
                     }
-                    if (++attempts > 50) {
-                        const err = new Error(`${_tag} Kernel (${_kernelResource}) not ready after 5s`);
+                    if (++attempts > 100) {
+                        const err = new Error(`${_tag} Kernel not ready after 10s`);
                         console.error(err.message);
                         reject(err);
                         return;
