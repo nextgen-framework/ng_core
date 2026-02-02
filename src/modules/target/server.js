@@ -12,7 +12,6 @@
 class TargetManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = null;
 
     // Server-registered options (for validation)
     this.serverOptions = new Map(); // optionId => { type, validator }
@@ -25,8 +24,6 @@ class TargetManager {
   }
 
   async init() {
-    this.db = this.framework.getModule('database');
-
     // Register RPC handlers
     this.registerRPC();
 

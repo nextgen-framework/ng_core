@@ -331,6 +331,16 @@ class ZoneManagerModule {
 
         checksPerformed++;
       }
+
+      // Phase 3: Handle zone exits (zones from query where player was in but isn't now)
+      for (let i = 0; i < zones.length; i++) {
+        const zone = zones[i];
+        if (!zone.enabled) continue;
+        if (zone._playersInside.has(source) && !playerZones.has(zone.id)) {
+          zone._playersInside.delete(source);
+          if (zone.onExit) zone.onExit(player, zone);
+        }
+      }
     });
 
     const totalTime = timer.end();
