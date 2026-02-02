@@ -79,9 +79,7 @@ class SyncManager {
       this.syncToPlayer(source);
     });
 
-    this.framework.log.info('Sync manager module initialized').padStart(2, '0')}`,
-      weather: this.state.weather.current
-    });
+    this.framework.log.info('Sync manager module initialized');
   }
 
   // ================================
