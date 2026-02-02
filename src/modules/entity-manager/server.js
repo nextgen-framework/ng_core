@@ -30,7 +30,7 @@ class EntityManager {
     await entity.init();
 
     this.entities.set(entityId, entity);
-    global.NextGenUtils.Log(`Entity ${entityId} (${type}) created`, 'info');
+    this.framework.log.info(`Entity ${entityId} (${type}) created`);
 
     return entity;
   }
@@ -42,14 +42,14 @@ class EntityManager {
   async remove(entityId) {
     const entity = this.entities.get(entityId);
     if (!entity) {
-      global.NextGenUtils.Log(`Entity ${entityId} not found in pool`, 'warn');
+      this.framework.log.warn(`Entity ${entityId} not found in pool`);
       return;
     }
 
     await entity.destroy();
     this.entities.delete(entityId);
 
-    global.NextGenUtils.Log(`Entity ${entityId} removed from pool`, 'info');
+    this.framework.log.info(`Entity ${entityId} removed from pool`);
   }
 
   /**
@@ -152,7 +152,7 @@ class Entity {
   async init() {
     // Entities are typically spawned client-side
     // Server just manages the state and metadata
-    global.NextGenUtils.Log(`Entity ${this.id} (${this.type}) initialized`, 'info');
+    this.framework.log.info(`Entity ${this.id} (${this.type}) initialized`);
   }
 
   /**
@@ -165,7 +165,7 @@ class Entity {
     }
 
     this.metadata = {};
-    global.NextGenUtils.Log(`Entity ${this.id} destroyed`, 'info');
+    this.framework.log.info(`Entity ${this.id} destroyed`);
   }
 
   /**
@@ -200,7 +200,7 @@ class Entity {
    */
   setState(key, value, replicated = true) {
     if (!this.stateBag) {
-      global.NextGenUtils.Log(`Cannot set state on entity ${this.id}: no state bag`, 'warn');
+      this.framework.log.warn(`Cannot set state on entity ${this.id}: no state bag`);
       return;
     }
     this.stateBag.set(key, value, replicated);
@@ -223,7 +223,7 @@ class Entity {
    */
   setCoords(x, y, z) {
     if (!this.handle || !DoesEntityExist(this.handle)) {
-      global.NextGenUtils.Log(`Cannot set coords on entity ${this.id}: entity not spawned`, 'warn');
+      this.framework.log.warn(`Cannot set coords on entity ${this.id}: entity not spawned`);
       return;
     }
     SetEntityCoords(this.handle, x, y, z, false, false, false, false);
@@ -246,7 +246,7 @@ class Entity {
    */
   setRotation(pitch, roll, yaw) {
     if (!this.handle || !DoesEntityExist(this.handle)) {
-      global.NextGenUtils.Log(`Cannot set rotation on entity ${this.id}: entity not spawned`, 'warn');
+      this.framework.log.warn(`Cannot set rotation on entity ${this.id}: entity not spawned`);
       return;
     }
     SetEntityRotation(this.handle, pitch, roll, yaw, 2, true);
@@ -267,7 +267,7 @@ class Entity {
    */
   setHeading(heading) {
     if (!this.handle || !DoesEntityExist(this.handle)) {
-      global.NextGenUtils.Log(`Cannot set heading on entity ${this.id}: entity not spawned`, 'warn');
+      this.framework.log.warn(`Cannot set heading on entity ${this.id}: entity not spawned`);
       return;
     }
     SetEntityHeading(this.handle, heading);

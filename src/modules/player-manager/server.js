@@ -67,7 +67,7 @@ class PlayerManager {
    */
   async create(source) {
     if (this.players.has(source)) {
-      global.NextGenUtils.Log(`Player ${source} already exists in pool`, 'warn');
+      this.framework.log.warn(`Player ${source} already exists in pool`);
       return this.players.get(source);
     }
 
@@ -75,7 +75,7 @@ class PlayerManager {
     await player.init();
 
     this.players.set(source, player);
-    global.NextGenUtils.Log(`Player ${source} added to pool`, 'info');
+    this.framework.log.info(`Player ${source} added to pool`);
 
     return player;
   }
@@ -92,7 +92,7 @@ class PlayerManager {
 
     const player = this.players.get(source);
     if (!player) {
-      global.NextGenUtils.Log(`Player ${source} not found in pool`, 'warn');
+      this.framework.log.warn(`Player ${source} not found in pool`);
       return;
     }
 
@@ -100,7 +100,7 @@ class PlayerManager {
     await player.destroy();
 
     this.players.delete(source);
-    global.NextGenUtils.Log(`Player ${source} removed from pool`, 'info');
+    this.framework.log.info(`Player ${source} removed from pool`);
   }
 
   /**
@@ -217,7 +217,7 @@ class PlayerClass {
     // Set initial ping
     this.ping = GetPlayerPing(this.source);
 
-    global.NextGenUtils.Log(`Player ${this.source} (${this.name}) initialized`, 'info');
+    this.framework.log.info(`Player ${this.source} (${this.name}) initialized`);
   }
 
   /**
@@ -227,7 +227,7 @@ class PlayerClass {
     // Clear custom data
     this.data = {};
 
-    global.NextGenUtils.Log(`Player ${this.source} destroyed`, 'info');
+    this.framework.log.info(`Player ${this.source} destroyed`);
   }
 
   /**

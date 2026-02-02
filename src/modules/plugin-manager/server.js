@@ -70,7 +70,7 @@ class PluginManager {
             try {
               await this.load(pluginName, {}, entryPoint);
             } catch (error) {
-              global.NextGenUtils.Log(`Failed to auto-load internal plugin "${pluginName}": ${error.message}`, 'error');
+              this.framework.log.error(`Failed to auto-load internal plugin "${pluginName}": ${error.message}`);
             }
           }
         }
@@ -83,12 +83,12 @@ class PluginManager {
    */
   enableAutoDetection() {
     if (this.autoDetectionEnabled) {
-      global.NextGenUtils.Log('Plugin auto-detection is already enabled', 'warn');
+      this.framework.log.warn('Plugin auto-detection is already enabled');
       return;
     }
 
     this.autoDetectionEnabled = true;
-    global.NextGenUtils.Log('Enabling plugin auto-detection for external resources...', 'info');
+    this.framework.log.info('Enabling plugin auto-detection for external resources...');
 
     // Listen for resource start events
     on('onResourceStart', async (resourceName) => {
@@ -119,7 +119,7 @@ class PluginManager {
       await this.scanExistingResources();
     });
 
-    global.NextGenUtils.Log('Plugin auto-detection enabled successfully', 'info');
+    this.framework.log.info('Plugin auto-detection enabled successfully');
   }
 
   /**
@@ -127,7 +127,7 @@ class PluginManager {
    * Plugins are loaded in priority order (lower number = loads first)
    */
   async scanExistingResources() {
-    global.NextGenUtils.Log('Scanning existing resources for ng_core plugins...', 'info');
+    this.framework.log.info('Scanning existing resources for ng_core plugins...');
 
     const numResources = GetNumResources();
     const detectedPlugins = [];
@@ -170,22 +170,21 @@ class PluginManager {
         );
         loadedPlugins++;
       } catch (error) {
-        global.NextGenUtils.Log(
-          `Failed to load plugin ${pluginInfo.resourceName}: ${error.message}`,
-          'error'
+        this.framework.log.error(
+          `Failed to load plugin ${pluginInfo.resourceName}: ${error.message}`
         );
       }
     }
 
     if (loadedPlugins > 0) {
-      global.NextGenUtils.Log(`Found and loaded ${loadedPlugins} existing plugin(s) (sorted by priority)`, 'info');
+      this.framework.log.info(`Found and loaded ${loadedPlugins} existing plugin(s) (sorted by priority)`);
     } else {
-      global.NextGenUtils.Log('No existing plugins found', 'info');
+      this.framework.log.info('No existing plugins found');
     }
 
     // Emit event that all plugins have been loaded
     this.framework.eventBus.emit(this.framework.constants.Events.ALL_PLUGINS_LOADED);
-    global.NextGenUtils.Log('All plugins loaded successfully', 'info');
+    this.framework.log.info('All plugins loaded successfully');
   }
 
   /**
@@ -225,7 +224,7 @@ class PluginManager {
       };
 
     } catch (error) {
-      global.NextGenUtils.Log(`Failed to detect plugin from resource "${resourceName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to detect plugin from resource "${resourceName}": ${error.message}`);
       return null;
     }
   }
@@ -267,7 +266,7 @@ class PluginManager {
       return true;
 
     } catch (error) {
-      global.NextGenUtils.Log(`Failed to detect/load plugin from resource "${resourceName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to detect/load plugin from resource "${resourceName}": ${error.message}`);
       return false;
     }
   }
@@ -325,7 +324,7 @@ class PluginManager {
       });
       this.pluginStates.set(resourceName, this.framework.constants.PluginState.LOADED);
 
-      global.NextGenUtils.Log(`External plugin "${resourceName}" loaded successfully (auto-detected)`, 'info');
+      this.framework.log.info(`External plugin "${resourceName}" loaded successfully (auto-detected)`);
 
       // Run after-load hook
       await this.framework.events.pipe(
@@ -343,7 +342,7 @@ class PluginManager {
 
     } catch (error) {
       this.pluginStates.set(resourceName, this.framework.constants.PluginState.ERROR);
-      global.NextGenUtils.Log(`Failed to load external plugin "${resourceName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load external plugin "${resourceName}": ${error.message}`);
       throw error;
     }
   }
@@ -360,7 +359,7 @@ class PluginManager {
     }
 
     try {
-      global.NextGenUtils.Log(`Unloading external plugin: ${resourceName}`, 'info');
+      this.framework.log.info(`Unloading external plugin: ${resourceName}`);
 
       const plugin = pluginInfo.instance;
 
@@ -376,7 +375,7 @@ class PluginManager {
       this.externalPlugins.delete(resourceName);
       this.pluginStates.set(resourceName, this.framework.constants.PluginState.UNLOADED);
 
-      global.NextGenUtils.Log(`External plugin "${resourceName}" unloaded successfully`, 'info');
+      this.framework.log.info(`External plugin "${resourceName}" unloaded successfully`);
 
       // Emit plugin unloaded event
       this.framework.eventBus.emit(
@@ -385,7 +384,7 @@ class PluginManager {
       );
 
     } catch (error) {
-      global.NextGenUtils.Log(`Failed to unload external plugin "${resourceName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to unload external plugin "${resourceName}": ${error.message}`);
     }
   }
 
@@ -399,7 +398,7 @@ class PluginManager {
   async load(pluginName, options = {}, customPath = null) {
     // Check if already loaded
     if (this.plugins.has(pluginName)) {
-      global.NextGenUtils.Log(`Plugin "${pluginName}" is already loaded`, 'warn');
+      this.framework.log.warn(`Plugin "${pluginName}" is already loaded`);
       return this.plugins.get(pluginName);
     }
 
@@ -452,7 +451,7 @@ class PluginManager {
       this.plugins.set(pluginName, pluginInstance);
       this.pluginStates.set(pluginName, this.framework.constants.PluginState.LOADED);
 
-      global.NextGenUtils.Log(`Plugin "${pluginName}" loaded successfully`, 'info');
+      this.framework.log.info(`Plugin "${pluginName}" loaded successfully`);
 
       // Run after-load hook
       await this.framework.events.pipe(
@@ -472,7 +471,7 @@ class PluginManager {
 
     } catch (error) {
       this.pluginStates.set(pluginName, this.framework.constants.PluginState.ERROR);
-      global.NextGenUtils.Log(`Failed to load plugin "${pluginName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load plugin "${pluginName}": ${error.message}`);
       throw error;
     }
   }
@@ -507,12 +506,12 @@ class PluginManager {
         throw new Error(`No valid entry point found in resource "${resourceName}"`);
       }
 
-      global.NextGenUtils.Log(`Loading external plugin from resource: ${resourceName}`, 'info');
+      this.framework.log.info(`Loading external plugin from resource: ${resourceName}`);
 
       return await this.load(resourceName, options, pluginPath);
 
     } catch (error) {
-      global.NextGenUtils.Log(`Failed to load plugin from resource "${resourceName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load plugin from resource "${resourceName}": ${error.message}`);
       throw error;
     }
   }
@@ -525,7 +524,7 @@ class PluginManager {
    */
   async register(pluginName, pluginInstance) {
     if (this.plugins.has(pluginName)) {
-      global.NextGenUtils.Log(`Plugin "${pluginName}" is already registered`, 'warn');
+      this.framework.log.warn(`Plugin "${pluginName}" is already registered`);
       return;
     }
 
@@ -541,7 +540,7 @@ class PluginManager {
       this.plugins.set(pluginName, pluginInstance);
       this.pluginStates.set(pluginName, this.framework.constants.PluginState.LOADED);
 
-      global.NextGenUtils.Log(`External plugin "${pluginName}" registered successfully`, 'info');
+      this.framework.log.info(`External plugin "${pluginName}" registered successfully`);
 
       // Run after-load hook
       await this.framework.events.pipe(
@@ -559,7 +558,7 @@ class PluginManager {
 
     } catch (error) {
       this.pluginStates.set(pluginName, this.framework.constants.PluginState.ERROR);
-      global.NextGenUtils.Log(`Failed to register plugin "${pluginName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to register plugin "${pluginName}": ${error.message}`);
       throw error;
     }
   }
@@ -571,7 +570,7 @@ class PluginManager {
   async unload(pluginName) {
     const plugin = this.plugins.get(pluginName);
     if (!plugin) {
-      global.NextGenUtils.Log(`Plugin "${pluginName}" is not loaded`, 'warn');
+      this.framework.log.warn(`Plugin "${pluginName}" is not loaded`);
       return;
     }
 
@@ -587,7 +586,7 @@ class PluginManager {
       this.plugins.delete(pluginName);
       this.pluginStates.set(pluginName, this.framework.constants.PluginState.UNLOADED);
 
-      global.NextGenUtils.Log(`Plugin "${pluginName}" unloaded successfully`, 'info');
+      this.framework.log.info(`Plugin "${pluginName}" unloaded successfully`);
 
       // Emit plugin unloaded event
       this.framework.eventBus.emit(
@@ -596,7 +595,7 @@ class PluginManager {
       );
 
     } catch (error) {
-      global.NextGenUtils.Log(`Failed to unload plugin "${pluginName}": ${error.message}`, 'error');
+      this.framework.log.error(`Failed to unload plugin "${pluginName}": ${error.message}`);
       throw error;
     }
   }

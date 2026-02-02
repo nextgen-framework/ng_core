@@ -48,7 +48,7 @@ class RPCModule {
           error: error.message
         });
 
-        global.NextGenUtils.Log(`RPC error "${rpcName}": ${error.message}`, 'error');
+        this.framework.log.error(`RPC error "${rpcName}": ${error.message}`);
       }
     });
 
@@ -76,11 +76,11 @@ class RPCModule {
    */
   register(name, handler) {
     if (this.handlers.has(name)) {
-      global.NextGenUtils.Log(`RPC handler "${name}" already exists, overwriting`, 'warn');
+      this.framework.log.warn(`RPC handler "${name}" already exists, overwriting`);
     }
 
     this.handlers.set(name, handler);
-    global.NextGenUtils.Log(`Registered RPC: ${name}`, 'info');
+    this.framework.log.info(`Registered RPC: ${name}`);
   }
 
   /**
