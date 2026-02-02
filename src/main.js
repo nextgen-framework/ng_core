@@ -136,13 +136,6 @@ class ModuleRegistry {
         // FiveM native event wrappers (uses captured references)
         const netHandlers = new Map();
         this.fivem = {
-            /**
-             * Listen for a FiveM network event with priority
-             * Handles RegisterNetEvent automatically (cerulean)
-             * @param {string} event - Network event name
-             * @param {Function} handler - Event handler
-             * @param {number} [priority=10] - Execution priority (0 = first)
-             */
             onNet(event, handler, priority = 10) {
                 if (!netHandlers.has(event)) {
                     netHandlers.set(event, []);
@@ -159,11 +152,8 @@ class ModuleRegistry {
                 list.push({ fn: handler, priority });
                 list.sort((a, b) => a.priority - b.priority);
             },
-            /** Emit a FiveM network event */
             emitNet(...args) { _emitNet(...args); },
-            /** Listen for a FiveM local event */
             on(...args) { _on(...args); },
-            /** Emit a FiveM local event */
             emit(...args) { _emit(...args); }
         };
 
@@ -314,6 +304,29 @@ class ModuleRegistry {
         return [...this._modules.keys()];
     }
 
+    /**
+     * Expose module methods as FiveM exports (bridge pattern)
+     * @param {string} moduleName - Module to proxy
+     * @param {Object} mappings - { ExportName: 'method' } or { ExportName: { method, fallback } }
+     */
+    expose(moduleName, mappings) {
+        for (const [exportName, config] of Object.entries(mappings)) {
+            const isString = typeof config === 'string';
+            const method = isString ? config : config.method;
+            const hasFallback = !isString && 'fallback' in config;
+            const fallback = hasFallback ? config.fallback : undefined;
+
+            exports(exportName, (...args) => {
+                const mod = this.getModule(moduleName);
+                if (!mod) {
+                    if (hasFallback) return fallback;
+                    throw new Error(`${moduleName} module not loaded`);
+                }
+                return mod[method](...args);
+            });
+        }
+    }
+
 }
 
 // Global instance
@@ -329,7 +342,11 @@ on('onResourceStop', async (resourceName) => {
     await Framework.destroy();
 });
 
-// FiveM exports (primitives only - survive inter-resource serialization)
+// Register kernel resource name for bridge auto-detection
+SetConvar('ng_kernel_resource', GetCurrentResourceName());
+
+// FiveM exports
+exports('GetFramework', () => Framework);
 exports('IsReady', () => Framework.isReady());
 const _version = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) || '0.0.0';
 exports('GetVersion', () => _version);

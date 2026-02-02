@@ -270,6 +270,14 @@ class PluginManager {
   }
 
   /**
+   * Get all loaded plugin names
+   * @returns {string[]}
+   */
+  getLoadedPlugins() {
+    return Array.from(this.plugins.keys());
+  }
+
+  /**
    * Cleanup method
    */
   async destroy() {

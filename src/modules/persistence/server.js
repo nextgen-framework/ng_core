@@ -14,7 +14,6 @@ class PersistenceManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // Registered save handlers from modules
     this.saveHandlers = new Map(); // moduleName => { handler, interval, lastSave }
@@ -37,20 +36,20 @@ class PersistenceManager {
   }
 
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
     // Register event handlers
     this.registerEvents();
 
-    this.log('Persistence manager initialized', 'info');
+    this.framework.log.info('Persistence manager initialized');
   }
 
   registerEvents() {
     // Save on player disconnect
     if (this.config.saveOnDisconnect) {
       on('playerDropped', async (reason) => {
-        await this.savePlayerData(source, 'disconnect');
+        const src = global.source;
+        await this.savePlayerData(src, 'disconnect');
       });
     }
 
@@ -86,7 +85,7 @@ class PersistenceManager {
       this.startAutoSave(moduleName);
     }
 
-    this.log(`Registered save handler for ${moduleName} (interval: ${interval}ms)`, 'debug');
+    this.framework.log.debug(`Registered save handler for ${moduleName} (interval: ${interval}ms)`);
   }
 
   /**
@@ -96,7 +95,7 @@ class PersistenceManager {
   unregister(moduleName) {
     this.stopAutoSave(moduleName);
     this.saveHandlers.delete(moduleName);
-    this.log(`Unregistered save handler for ${moduleName}`, 'debug');
+    this.framework.log.debug(`Unregistered save handler for ${moduleName}`);
   }
 
   /**
@@ -115,12 +114,12 @@ class PersistenceManager {
       try {
         await this.saveModule(moduleName, 'auto-save');
       } catch (error) {
-        this.log(`Auto-save failed for ${moduleName}: ${error.message}`, 'error');
+        this.framework.log.error(`Auto-save failed for ${moduleName}: ${error.message}`);
       }
     }, saveData.interval);
 
     this.intervals.set(moduleName, intervalId);
-    this.log(`Started auto-save for ${moduleName}`, 'debug');
+    this.framework.log.debug(`Started auto-save for ${moduleName}`);
   }
 
   /**
@@ -132,7 +131,7 @@ class PersistenceManager {
     if (intervalId) {
       clearInterval(intervalId);
       this.intervals.delete(moduleName);
-      this.log(`Stopped auto-save for ${moduleName}`, 'debug');
+      this.framework.log.debug(`Stopped auto-save for ${moduleName}`);
     }
   }
 
@@ -144,7 +143,7 @@ class PersistenceManager {
   async saveModule(moduleName, reason = 'manual') {
     const saveData = this.saveHandlers.get(moduleName);
     if (!saveData) {
-      this.log(`No save handler registered for ${moduleName}`, 'warn');
+      this.framework.log.warn(`No save handler registered for ${moduleName}`);
       return { success: false, error: 'No handler registered' };
     }
 
@@ -160,21 +159,21 @@ class PersistenceManager {
         saveData.lastSave = Date.now();
         const duration = Date.now() - startTime;
 
-        this.log(`Saved ${moduleName} data (${reason}) in ${duration}ms`, 'debug');
+        this.framework.log.debug(`Saved ${moduleName} data (${reason}) in ${duration}ms`);
         return { success: true, duration };
       } catch (error) {
         lastError = error;
         retries++;
 
         if (retries < this.config.maxRetries) {
-          this.log(`Save failed for ${moduleName} (attempt ${retries}/${this.config.maxRetries}): ${error.message}`, 'warn');
+          this.framework.log.warn(`Save failed for ${moduleName} (attempt ${retries}/${this.config.maxRetries}): ${error.message}`);
           await this.sleep(1000 * retries); // Exponential backoff
         }
       }
     }
 
     // All retries failed
-    this.log(`Save failed for ${moduleName} after ${this.config.maxRetries} attempts: ${lastError.message}`, 'error');
+    this.framework.log.error(`Save failed for ${moduleName} after ${this.config.maxRetries} attempts: ${lastError.message}`);
     return { success: false, error: lastError.message };
   }
 
@@ -197,7 +196,7 @@ class PersistenceManager {
         await saveData.handler(source);
         results.push({ module: moduleName, success: true });
       } catch (error) {
-        this.log(`Failed to save player data for ${moduleName}: ${error.message}`, 'error');
+        this.framework.log.error(`Failed to save player data for ${moduleName}: ${error.message}`);
         results.push({ module: moduleName, success: false, error: error.message });
       }
     }
@@ -205,7 +204,7 @@ class PersistenceManager {
     const duration = Date.now() - startTime;
     const successCount = results.filter(r => r.success).length;
 
-    this.log(`Saved player ${source} data from ${successCount}/${results.length} modules (${reason}) in ${duration}ms`, 'debug');
+    this.framework.log.debug(`Saved player ${source} data from ${successCount}/${results.length} modules (${reason}) in ${duration}ms`);
     return { success: true, results, duration };
   }
 
@@ -215,7 +214,7 @@ class PersistenceManager {
    */
   async saveAll(reason = 'manual') {
     if (this.isSaving) {
-      this.log('Save already in progress, skipping', 'warn');
+      this.framework.log.warn('Save already in progress, skipping');
       return { success: false, error: 'Save in progress' };
     }
 
@@ -223,7 +222,7 @@ class PersistenceManager {
     const startTime = Date.now();
     const results = [];
 
-    this.log(`Starting full save (${reason})...`, 'info');
+    this.framework.log.info(`Starting full save (${reason})...`);
 
     for (const moduleName of this.saveHandlers.keys()) {
       const result = await this.saveModule(moduleName, reason);
@@ -239,7 +238,7 @@ class PersistenceManager {
     const duration = Date.now() - startTime;
     const successCount = results.filter(r => r.success).length;
 
-    this.log(`Full save completed: ${successCount}/${results.length} modules in ${duration}ms`, 'info');
+    this.framework.log.info(`Full save completed: ${successCount}/${results.length} modules in ${duration}ms`);
     return { success: true, results, duration };
   }
 
@@ -278,12 +277,6 @@ class PersistenceManager {
    */
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, { module: 'persistence', ...metadata });
-    }
   }
 
   async destroy() {

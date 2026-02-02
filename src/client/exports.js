@@ -3,55 +3,30 @@
  * FiveM export wrappers for external resources
  */
 
-// Core exports
-exports('GetFramework', () => global.Framework);
+const fw = global.Framework;
 
-exports('GetModule', (moduleName) => {
-    return global.Framework.getModule(moduleName);
-});
+// Core exports (manual - not module methods)
+exports('GetFramework', () => fw);
+exports('GetModule', (name) => fw.getModule(name));
 
 // RPC
-exports('RegisterRPC', (name, handler) => {
-    const rpc = global.Framework.getModule('rpc');
-    if (!rpc) throw new Error('rpc module not loaded');
-    return rpc.register(name, handler);
+fw.expose('rpc', {
+    'RegisterRPC': 'register',
 });
 
 // Plugin management
-exports('RegisterPlugin', async (pluginName, pluginInstance) => {
-    const pluginManager = global.Framework.getModule('plugin-manager');
-    if (!pluginManager) throw new Error('plugin-manager module not loaded');
-    return await pluginManager.register(pluginName, pluginInstance);
+fw.expose('plugin-manager', {
+    'RegisterPlugin': 'register',
+    'LoadPluginFromResource': 'loadFromResource',
+    'IsPluginLoaded': { method: 'has', fallback: false },
+    'GetLoadedPlugins': { method: 'getLoadedPlugins', fallback: [] },
 });
 
-exports('LoadPluginFromResource', async (resourceName, options) => {
-    const pluginManager = global.Framework.getModule('plugin-manager');
-    if (!pluginManager) throw new Error('plugin-manager module not loaded');
-    return await pluginManager.loadFromResource(resourceName, options);
-});
-
-// Notification helpers (wrapper functions to preserve class methods)
-exports('Notify', (message, type, duration) => {
-    const notif = global.Framework.getModule('notifications');
-    if (notif) notif.notify(message, type, duration);
-});
-
-exports('NotifySuccess', (message, duration) => {
-    const notif = global.Framework.getModule('notifications');
-    if (notif) notif.success(message, duration);
-});
-
-exports('NotifyInfo', (message, duration) => {
-    const notif = global.Framework.getModule('notifications');
-    if (notif) notif.info(message, duration);
-});
-
-exports('NotifyWarning', (message, duration) => {
-    const notif = global.Framework.getModule('notifications');
-    if (notif) notif.warning(message, duration);
-});
-
-exports('NotifyError', (message, duration) => {
-    const notif = global.Framework.getModule('notifications');
-    if (notif) notif.error(message, duration);
+// Notifications
+fw.expose('notifications', {
+    'Notify': { method: 'notify', fallback: null },
+    'NotifySuccess': { method: 'success', fallback: null },
+    'NotifyInfo': { method: 'info', fallback: null },
+    'NotifyWarning': { method: 'warning', fallback: null },
+    'NotifyError': { method: 'error', fallback: null },
 });
