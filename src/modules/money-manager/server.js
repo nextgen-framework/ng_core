@@ -7,7 +7,6 @@ class MoneyManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.playerManager = null;
 
     // Money cache for online players
@@ -30,7 +29,6 @@ class MoneyManager {
    * Initialize money manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
 
@@ -45,7 +43,7 @@ class MoneyManager {
       this.playerMoney.delete(source);
     });
 
-    this.log('Money manager module initialized', 'info');
+    this.framework.log.info('Money manager module initialized');
   }
 
   // ================================
@@ -88,10 +86,10 @@ class MoneyManager {
         });
       }
 
-      this.log(`Loaded money for player ${source}`, 'debug');
+      this.framework.log.debug(`Loaded money for player ${source}`);
       return true;
     } catch (error) {
-      this.log(`Failed to load player money: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load player money: ${error.message}`);
       return false;
     }
   }
@@ -115,10 +113,10 @@ class MoneyManager {
         [money.cash, money.bank, money.black_money, identifier]
       );
 
-      this.log(`Saved money for player ${source}`, 'debug');
+      this.framework.log.debug(`Saved money for player ${source}`);
       return true;
     } catch (error) {
-      this.log(`Failed to save player money: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to save player money: ${error.message}`);
       return false;
     }
   }
@@ -169,7 +167,7 @@ class MoneyManager {
     // Sync to client
     this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
-    this.log(`Set ${type} for player ${source}: ${oldAmount} -> ${money[type]}`, 'info', { reason });
+    this.framework.log.info(`Set ${type} for player ${source}: ${oldAmount} -> ${money[type]}`);
 
     return { success: true, newAmount: money[type] };
   }
@@ -209,7 +207,7 @@ class MoneyManager {
     // Sync to client
     this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
-    this.log(`Added ${actualAdded} ${type} to player ${source}`, 'debug', { reason });
+    this.framework.log.debug(`Added ${actualAdded} ${type} to player ${source}`);
 
     return { success: true, added: actualAdded, newAmount: money[type] };
   }
@@ -245,7 +243,7 @@ class MoneyManager {
     // Sync to client
     this.framework.fivem.emitNet('ng_core:money-update', source, type, money[type]);
 
-    this.log(`Removed ${amount} ${type} from player ${source}`, 'debug', { reason });
+    this.framework.log.debug(`Removed ${amount} ${type} from player ${source}`);
 
     return { success: true, removed: amount, newAmount: money[type] };
   }
@@ -278,7 +276,7 @@ class MoneyManager {
       await this.logTransaction(fromSource, toSource, type, amount, 'transfer', reason);
     }
 
-    this.log(`Transferred ${amount} ${type} from ${fromSource} to ${toSource}`, 'info', { reason });
+    this.framework.log.info(`Transferred ${amount} ${type} from ${fromSource} to ${toSource}`);
 
     return { success: true, amount };
   }
@@ -324,7 +322,7 @@ class MoneyManager {
     this.framework.fivem.emitNet('ng_core:money-update', source, 'cash', money.cash);
     this.framework.fivem.emitNet('ng_core:money-update', source, 'bank', money.bank);
 
-    this.log(`Player ${source} deposited ${amount} to bank`, 'debug');
+    this.framework.log.debug(`Player ${source} deposited ${amount} to bank`);
 
     return { success: true, newCash: money.cash, newBank: money.bank };
   }
@@ -360,7 +358,7 @@ class MoneyManager {
     this.framework.fivem.emitNet('ng_core:money-update', source, 'cash', money.cash);
     this.framework.fivem.emitNet('ng_core:money-update', source, 'bank', money.bank);
 
-    this.log(`Player ${source} withdrew ${amount} from bank`, 'debug');
+    this.framework.log.debug(`Player ${source} withdrew ${amount} from bank`);
 
     return { success: true, newCash: money.cash, newBank: money.bank };
   }
@@ -386,7 +384,7 @@ class MoneyManager {
         [fromIdentifier, toIdentifier, type, amount, transactionType, reason]
       );
     } catch (error) {
-      this.log(`Failed to log transaction: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to log transaction: ${error.message}`);
     }
   }
 
@@ -408,7 +406,7 @@ class MoneyManager {
 
       return transactions;
     } catch (error) {
-      this.log(`Failed to get transactions: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get transactions: ${error.message}`);
       return [];
     }
   }
@@ -426,10 +424,10 @@ class MoneyManager {
         [cutoffDate]
       );
 
-      this.log(`Cleaned ${result.affectedRows} old transactions`, 'info');
+      this.framework.log.info(`Cleaned ${result.affectedRows} old transactions`);
       return result.affectedRows;
     } catch (error) {
-      this.log(`Failed to clean old transactions: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to clean old transactions: ${error.message}`);
       return 0;
     }
   }
@@ -462,7 +460,7 @@ class MoneyManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Money manager configuration updated', 'info');
+    this.framework.log.info('Money manager configuration updated');
   }
 
   /**
@@ -483,21 +481,11 @@ class MoneyManager {
 
       return stats[0] || {};
     } catch (error) {
-      this.log(`Failed to get stats: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get stats: ${error.message}`);
       return {};
     }
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Money Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -509,7 +497,7 @@ class MoneyManager {
     }
 
     this.playerMoney.clear();
-    this.log('Money manager module destroyed', 'info');
+    this.framework.log.info('Money manager module destroyed');
   }
 }
 

@@ -52,7 +52,7 @@ class TargetManager {
   }
 
   async init() {
-    this.log('Target manager initialized', 'info');
+    this.framework.log.info('Target manager initialized');
 
     // Start raycast thread
     this.startRaycastThread();
@@ -328,7 +328,7 @@ class TargetManager {
       this.modelOptions.set(model, options);
     }
 
-    this.log(`Registered ${options.length} options for ${models.length} models`, 'debug');
+    this.framework.log.debug(`Registered ${options.length} options for ${models.length} models`);
   }
 
   /**
@@ -338,7 +338,7 @@ class TargetManager {
    */
   addEntity(entity, options) {
     this.entityOptions.set(entity, options);
-    this.log(`Registered ${options.length} options for entity ${entity}`, 'debug');
+    this.framework.log.debug(`Registered ${options.length} options for entity ${entity}`);
   }
 
   /**
@@ -348,7 +348,7 @@ class TargetManager {
    */
   addEntityType(type, options) {
     this.typeOptions.set(type, options);
-    this.log(`Registered ${options.length} options for type ${type}`, 'debug');
+    this.framework.log.debug(`Registered ${options.length} options for type ${type}`);
   }
 
   /**
@@ -358,7 +358,7 @@ class TargetManager {
    */
   addZone(zoneName, options) {
     this.zoneOptions.set(zoneName, options);
-    this.log(`Registered ${options.length} options for zone ${zoneName}`, 'debug');
+    this.framework.log.debug(`Registered ${options.length} options for zone ${zoneName}`);
   }
 
   /**

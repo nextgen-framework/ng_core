@@ -7,7 +7,6 @@ class OrganizationManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.moneyManager = null;
     this.accessManager = null;
 
@@ -24,13 +23,12 @@ class OrganizationManager {
   }
 
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.moneyManager = this.framework.getModule('money-manager');
     this.accessManager = this.framework.getModule('access-manager');
 
     await this.loadOrganizations();
-    this.log('Organization manager initialized', 'info');
+    this.framework.log.info('Organization manager initialized');
   }
 
   async loadOrganizations() {
@@ -42,9 +40,9 @@ class OrganizationManager {
           metadata: typeof org.metadata === 'string' ? JSON.parse(org.metadata) : org.metadata
         });
       }
-      this.log(`Loaded ${orgs.length} organizations`, 'debug');
+      this.framework.log.debug(`Loaded ${orgs.length} organizations`);
     } catch (error) {
-      this.log(`Failed to load organizations: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load organizations: ${error.message}`);
     }
   }
 
@@ -58,10 +56,10 @@ class OrganizationManager {
       const org = { id, name, type, metadata };
       this.organizations.set(id, org);
 
-      this.log(`Created organization: ${name}`, 'info');
+      this.framework.log.info(`Created organization: ${name}`);
       return { success: true, organization: org };
     } catch (error) {
-      this.log(`Failed to create organization: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to create organization: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -77,7 +75,7 @@ class OrganizationManager {
         [orgId, characterId, grade]
       );
 
-      this.log(`Added employee to ${orgId}`, 'debug');
+      this.framework.log.debug(`Added employee to ${orgId}`);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -96,11 +94,6 @@ class OrganizationManager {
     }
   }
 
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    }
-  }
 
   async destroy() {
     this.organizations.clear();

@@ -7,7 +7,6 @@ class CharacterManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.playerManager = null;
 
     // Active characters cache
@@ -30,7 +29,6 @@ class CharacterManager {
    * Initialize character manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
 
@@ -48,7 +46,7 @@ class CharacterManager {
       this.activeCharacters.delete(source);
     });
 
-    this.log('Character manager module initialized', 'info');
+    this.framework.log.info('Character manager module initialized');
   }
 
   // ================================
@@ -85,7 +83,7 @@ class CharacterManager {
         last_played: char.last_played
       }));
     } catch (error) {
-      this.log(`Failed to get player characters: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get player characters: ${error.message}`);
       return [];
     }
   }
@@ -140,10 +138,7 @@ class CharacterManager {
 
       const characterId = result.insertId;
 
-      this.log(`Created character: ${characterData.firstname} ${characterData.lastname} (ID: ${characterId})`, 'info', {
-        source,
-        identifier
-      });
+      this.framework.log.info(`Created character: ${characterData.firstname} ${characterData.lastname} (ID: ${characterId})`);
 
       // Trigger hook for other modules (e.g., money-manager to create account)
       await this.framework.events.pipe('character:created', { source, characterId, characterData });
@@ -164,7 +159,7 @@ class CharacterManager {
         }
       };
     } catch (error) {
-      this.log(`Failed to create character: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to create character: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -218,14 +213,14 @@ class CharacterManager {
       // Cache active character
       this.activeCharacters.set(source, character);
 
-      this.log(`Player ${source} selected character ${characterId}`, 'info');
+      this.framework.log.info(`Player ${source} selected character ${characterId}`);
 
       // Trigger hook for other modules to load character data
       await this.framework.events.pipe('character:selected', { source, character });
 
       return { success: true, character };
     } catch (error) {
-      this.log(`Failed to select character: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to select character: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -261,14 +256,14 @@ class CharacterManager {
       // Delete character
       await this.db.execute('DELETE FROM characters WHERE id = ?', [characterId]);
 
-      this.log(`Deleted character ${characterId}`, 'info', { source, identifier });
+      this.framework.log.info(`Deleted character ${characterId}`);
 
       // Trigger hook after deletion
       await this.framework.events.pipe('character:deleted', { source, characterId });
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to delete character: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to delete character: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -317,11 +312,11 @@ class CharacterManager {
         values
       );
 
-      this.log(`Updated character ${characterId}`, 'debug');
+      this.framework.log.debug(`Updated character ${characterId}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to update character: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to update character: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -355,7 +350,7 @@ class CharacterManager {
         last_played: char.last_played
       };
     } catch (error) {
-      this.log(`Failed to get character: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get character: ${error.message}`);
       return null;
     }
   }
@@ -382,7 +377,7 @@ class CharacterManager {
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to set character metadata: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to set character metadata: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -456,7 +451,7 @@ class CharacterManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Character manager configuration updated', 'info');
+    this.framework.log.info('Character manager configuration updated');
   }
 
   /**
@@ -470,28 +465,18 @@ class CharacterManager {
 
       return stats[0] || {};
     } catch (error) {
-      this.log(`Failed to get stats: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get stats: ${error.message}`);
       return {};
     }
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Character Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
    */
   async destroy() {
     this.activeCharacters.clear();
-    this.log('Character manager module destroyed', 'info');
+    this.framework.log.info('Character manager module destroyed');
   }
 }
 

@@ -7,7 +7,6 @@ class VehicleManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.accessManager = null;
 
     // Spawned vehicles cache
@@ -15,11 +14,10 @@ class VehicleManager {
   }
 
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.accessManager = this.framework.getModule('access-manager');
 
-    this.log('Vehicle manager initialized', 'info');
+    this.framework.log.info('Vehicle manager initialized');
   }
 
   async createVehicle(plate, model, ownerType, ownerId, metadata = {}) {
@@ -29,10 +27,10 @@ class VehicleManager {
         [plate, model, ownerType, ownerId, JSON.stringify(metadata)]
       );
 
-      this.log(`Created vehicle: ${plate}`, 'info');
+      this.framework.log.info(`Created vehicle: ${plate}`);
       return { success: true, vehicleId: result.insertId };
     } catch (error) {
-      this.log(`Failed to create vehicle: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to create vehicle: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -48,7 +46,7 @@ class VehicleManager {
         metadata: typeof vehicle.metadata === 'string' ? JSON.parse(vehicle.metadata) : vehicle.metadata
       };
     } catch (error) {
-      this.log(`Failed to get vehicle: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get vehicle: ${error.message}`);
       return null;
     }
   }
@@ -65,7 +63,7 @@ class VehicleManager {
         metadata: typeof v.metadata === 'string' ? JSON.parse(v.metadata) : v.metadata
       }));
     } catch (error) {
-      this.log(`Failed to get player vehicles: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get player vehicles: ${error.message}`);
       return [];
     }
   }
@@ -79,11 +77,6 @@ class VehicleManager {
     }
   }
 
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    }
-  }
 
   async destroy() {
     this.spawnedVehicles.clear();

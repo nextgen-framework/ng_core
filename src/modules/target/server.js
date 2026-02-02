@@ -13,7 +13,6 @@ class TargetManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // Server-registered options (for validation)
     this.serverOptions = new Map(); // optionId => { type, validator }
@@ -26,13 +25,12 @@ class TargetManager {
   }
 
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
     // Register RPC handlers
     this.registerRPC();
 
-    this.log('Target manager (server) initialized', 'info');
+    this.framework.log.info('Target manager (server) initialized');
   }
 
   registerRPC() {
@@ -63,7 +61,7 @@ class TargetManager {
       metadata: config.metadata || {}
     });
 
-    this.log(`Registered server option: ${optionId}`, 'debug');
+    this.framework.log.debug(`Registered server option: ${optionId}`);
   }
 
   /**
@@ -90,11 +88,11 @@ class TargetManager {
       try {
         const result = await option.validator(source, data);
         if (!result) {
-          this.log(`Interaction validation failed for ${source}: ${optionId}`, 'warn');
+          this.framework.log.warn(`Interaction validation failed for ${source}: ${optionId}`);
           return { valid: false, reason: 'Validation failed' };
         }
       } catch (error) {
-        this.log(`Validator error for ${optionId}: ${error.message}`, 'error');
+        this.framework.log.error(`Validator error for ${optionId}: ${error.message}`);
         return { valid: false, reason: 'Validator error' };
       }
     }
@@ -117,7 +115,7 @@ class TargetManager {
       );
 
       if (actualDistance > 5.0) { // Max reasonable distance
-        this.log(`Distance check failed for ${source}: ${actualDistance}m`, 'warn');
+        this.framework.log.warn(`Distance check failed for ${source}: ${actualDistance}m`);
         return { valid: false, reason: 'Too far from entity' };
       }
     }
@@ -133,9 +131,8 @@ class TargetManager {
 
     const { optionId, entity, zone, label } = data;
 
-    this.log(
-      `Player ${source} interacted: ${label || optionId} (entity: ${entity || 'none'}, zone: ${zone || 'none'})`,
-      'debug'
+    this.framework.log.debug(
+      `Player ${source} interacted: ${label || optionId} (entity: ${entity || 'none'}, zone: ${zone || 'none'})`
     );
 
     // Could store in database for analytics
@@ -151,14 +148,6 @@ class TargetManager {
       total: 0,
       byType: {}
     };
-  }
-
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, { module: 'target', ...metadata });
-    } else {
-      console.log(`[Target] ${message}`);
-    }
   }
 
   async destroy() {

@@ -7,7 +7,6 @@ class Queue {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.whitelist = null;
 
     // Queue state
@@ -39,7 +38,6 @@ class Queue {
    * Initialize queue module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.whitelist = this.framework.getModule('whitelist');
     this.connectionManager = this.framework.getModule('connection-manager');
@@ -63,7 +61,7 @@ class Queue {
     });
 
     const forceQueueMsg = this.config.forceQueue ? ' [FORCE QUEUE MODE - TESTING]' : '';
-    this.log(`Queue module initialized (max: ${this.config.maxPlayers}, reserved: ${this.config.reservedSlots})${forceQueueMsg}`, 'info');
+    this.framework.log.info(`Queue module initialized (max: ${this.config.maxPlayers}, reserved: ${this.config.reservedSlots})${forceQueueMsg}`);
   }
 
   /**
@@ -81,7 +79,7 @@ class Queue {
       displayName
     });
 
-    this.log(`Registered queue type: ${typeName} (priority: ${priority}, reserved: ${reservedSlots})`, 'info');
+    this.framework.log.info(`Registered queue type: ${typeName} (priority: ${priority}, reserved: ${reservedSlots})`);
     return { success: true };
   }
 
@@ -91,7 +89,7 @@ class Queue {
   unregisterQueueType(typeName) {
     if (this.typeConfigs.has(typeName)) {
       this.typeConfigs.delete(typeName);
-      this.log(`Unregistered queue type: ${typeName}`, 'info');
+      this.framework.log.info(`Unregistered queue type: ${typeName}`);
       return { success: true };
     }
     return { success: false, error: 'Queue type not found' };
@@ -113,9 +111,9 @@ class Queue {
         }
       }
 
-      this.log(`Loaded ${priorities.length} queue priorities`, 'debug');
+      this.framework.log.debug(`Loaded ${priorities.length} queue priorities`);
     } catch (error) {
-      this.log(`Failed to load queue priorities: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load queue priorities: ${error.message}`);
     }
   }
 
@@ -193,7 +191,7 @@ class Queue {
 
     const position = this.getQueuePosition(source);
     const queueTypeStr = queueType ? `type: ${queueType}, ` : '';
-    this.log(`Player ${identifiers.license} added to queue (${queueTypeStr}priority: ${priority}, position: ${position}/${this.queue.length})`, 'info');
+    this.framework.log.info(`Player ${identifiers.license} added to queue (${queueTypeStr}priority: ${priority}, position: ${position}/${this.queue.length})`);
 
     // Also log to console for visibility
     const typeConfigForLog = queueType ? this.typeConfigs.get(queueType) : null;
@@ -281,7 +279,7 @@ class Queue {
     for (const entry of toTimeout) {
       this.removeFromQueue(entry.source);
       entry.deferrals.done('Connection timeout');
-      this.log(`Player ${entry.identifiers.license} timed out in queue`, 'warn');
+      this.framework.log.warn(`Player ${entry.identifiers.license} timed out in queue`);
     }
 
     // Process allowed entries
@@ -294,7 +292,7 @@ class Queue {
       const displayType = typeConfig ? typeConfig.displayName : (entry.queueType || 'Default');
       console.log(`[NextGen] [Queue] Player allowed from queue: ${entry.identifiers.license} | Queue: ${displayType} | Priority: ${entry.priority} | Waited: ${Math.floor((Date.now() - entry.joinedAt) / 1000)}s`);
 
-      this.log(`Player ${entry.identifiers.license} allowed to connect from queue`, 'info');
+      this.framework.log.info(`Player ${entry.identifiers.license} allowed to connect from queue`);
 
       // Notify plugins (ng_queue) to cleanup animation state
       this.framework.fivem.emit('ng:queue:playerExitQueue', entry.source);
@@ -453,13 +451,13 @@ class Queue {
         this.queueTypes.set(identifier, queueType);
       }
 
-      this.log(`Set queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`, 'info');
+      this.framework.log.info(`Set queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`);
 
       this.resortAndUpdate();
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to set priority: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to set priority: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -488,7 +486,7 @@ class Queue {
       this.dynamicQueueTypes.set(identifier, queueType);
     }
 
-    this.log(`Set dynamic queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`, 'info');
+    this.framework.log.info(`Set dynamic queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`);
 
     this.resortAndUpdate();
 
@@ -518,7 +516,7 @@ class Queue {
     this.dynamicQueueTypes.delete(identifier);
 
     if (hadPriority || hadType) {
-      this.log(`Removed dynamic queue assignment for ${identifier}`, 'info');
+      this.framework.log.info(`Removed dynamic queue assignment for ${identifier}`);
 
       this.resortAndUpdate();
 
@@ -536,10 +534,10 @@ class Queue {
       await this.db.execute('DELETE FROM queue_settings WHERE identifier = ?', [identifier]);
       this.priorities.delete(identifier);
       this.queueTypes.delete(identifier);
-      this.log(`Removed queue priority for ${identifier}`, 'info');
+      this.framework.log.info(`Removed queue priority for ${identifier}`);
       return { success: true };
     } catch (error) {
-      this.log(`Failed to remove priority: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to remove priority: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -595,7 +593,7 @@ class Queue {
    */
   enable() {
     this.config.enabled = true;
-    this.log('Queue enabled', 'info');
+    this.framework.log.info('Queue enabled');
   }
 
   /**
@@ -611,7 +609,7 @@ class Queue {
     }
     this.queue = [];
 
-    this.log('Queue disabled - all queued players allowed', 'warn');
+    this.framework.log.warn('Queue disabled - all queued players allowed');
   }
 
   /**
@@ -619,7 +617,7 @@ class Queue {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Queue configuration updated', 'info');
+    this.framework.log.info('Queue configuration updated');
   }
 
   /**
@@ -670,16 +668,6 @@ class Queue {
     this.processQueue();
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Queue] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -692,7 +680,7 @@ class Queue {
       entry.deferrals.done('Server shutting down');
     }
 
-    this.log('Queue module destroyed', 'info');
+    this.framework.log.info('Queue module destroyed');
   }
 }
 

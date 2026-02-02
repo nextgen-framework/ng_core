@@ -7,7 +7,6 @@ class SpawnManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.playerManager = null;
     this.zoneManager = null;
 
@@ -58,7 +57,6 @@ class SpawnManager {
    * Initialize spawn manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.playerManager = this.framework.getModule('player-manager');
     this.zoneManager = this.framework.getModule('zone-manager');
@@ -89,7 +87,7 @@ class SpawnManager {
       rpc.register('spawn:selectSpawn', this.selectSpawn.bind(this));
     }
 
-    this.log(`Spawn manager initialized with ${this.spawnPoints.size} spawn points`, 'info');
+    this.framework.log.info(`Spawn manager initialized with ${this.spawnPoints.size} spawn points`);
   }
 
   /**
@@ -128,7 +126,7 @@ class SpawnManager {
     }
     this.spawnCategories.get(category).add(id);
 
-    this.log(`Registered spawn point: ${name} (${id})`, 'debug');
+    this.framework.log.debug(`Registered spawn point: ${name} (${id})`);
 
     return spawnPoint;
   }
@@ -147,7 +145,7 @@ class SpawnManager {
     }
 
     this.spawnPoints.delete(id);
-    this.log(`Unregistered spawn point: ${id}`, 'debug');
+    this.framework.log.debug(`Unregistered spawn point: ${id}`);
 
     return true;
   }
@@ -187,7 +185,7 @@ class SpawnManager {
       const lastPos = await this.getLastPosition(source);
       if (lastPos) {
         this.spawnPlayerAt(source, lastPos.coords);
-        this.log(`Player ${source} spawned at last position`, 'debug');
+        this.framework.log.debug(`Player ${source} spawned at last position`);
         return;
       }
     }
@@ -288,7 +286,7 @@ class SpawnManager {
       timestamp: Date.now()
     });
 
-    this.log(`Player ${source} spawned at (${coords.x}, ${coords.y}, ${coords.z})`, 'debug');
+    this.framework.log.debug(`Player ${source} spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
   }
 
   /**
@@ -345,7 +343,7 @@ class SpawnManager {
         }
       };
     } catch (error) {
-      this.log(`Failed to get last position: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get last position: ${error.message}`);
       return null;
     }
   }
@@ -372,9 +370,9 @@ class SpawnManager {
         [identifier, coords[0], coords[1], coords[2], heading, coords[0], coords[1], coords[2], heading]
       );
 
-      this.log(`Saved last position for player ${source}`, 'debug');
+      this.framework.log.debug(`Saved last position for player ${source}`);
     } catch (error) {
-      this.log(`Failed to save last position: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to save last position: ${error.message}`);
     }
   }
 
@@ -400,9 +398,9 @@ class SpawnManager {
         );
       }
 
-      this.log(`Loaded ${spawns.length} spawn points from database`, 'debug');
+      this.framework.log.debug(`Loaded ${spawns.length} spawn points from database`);
     } catch (error) {
-      this.log(`Failed to load spawn points: ${error.message}`, 'warn');
+      this.framework.log.warn(`Failed to load spawn points: ${error.message}`);
     }
   }
 
@@ -438,7 +436,7 @@ class SpawnManager {
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to save spawn point: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to save spawn point: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -448,19 +446,9 @@ class SpawnManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Spawn manager configuration updated', 'info');
+    this.framework.log.info('Spawn manager configuration updated');
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Spawn Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -476,7 +464,7 @@ class SpawnManager {
     this.spawnCategories.clear();
     this.playerSpawns.clear();
 
-    this.log('Spawn manager module destroyed', 'info');
+    this.framework.log.info('Spawn manager module destroyed');
   }
 }
 

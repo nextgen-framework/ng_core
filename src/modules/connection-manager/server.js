@@ -6,7 +6,6 @@
 class ConnectionManager {
   constructor(framework) {
     this.framework = framework;
-    this.logger = null;
 
     // Track player connection stages by LICENSE (not source which changes)
     this.playerStages = new Map(); // license -> { source, stage, ...stage data }
@@ -21,7 +20,6 @@ class ConnectionManager {
    * Initialize connection manager
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.clientReadyResolvers = new Map();
 
     // Handle player drops
@@ -66,7 +64,7 @@ class ConnectionManager {
     // Start stuck client detection monitor
     this.startStuckClientMonitor();
 
-    this.log('Connection Manager initialized', 'info');
+    this.framework.log.info('Connection Manager initialized');
   }
 
   /**
@@ -227,7 +225,7 @@ class ConnectionManager {
       return true;
     } catch (error) {
       const license = identifiers?.license;
-      this.log(`Connection process failed for ${license || source}: ${error.message}`, 'error');
+      this.framework.log.error(`Connection process failed for ${license || source}: ${error.message}`);
       deferrals.done(`Connection failed: ${error.message}`);
       if (license) {
         this.cleanupPlayer(license);
@@ -537,7 +535,7 @@ class ConnectionManager {
     if (license) {
       const stage = this.getPlayerStageByLicense(license);
       if (stage) {
-        this.log(`Player ${license} (source ${source}) dropped during stage: ${stage} (${reason})`, 'info');
+        this.framework.log.info(`Player ${license} (source ${source}) dropped during stage: ${stage} (${reason})`);
         this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.DISCONNECTED);
       }
 
@@ -599,16 +597,6 @@ class ConnectionManager {
     };
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[ConnectionManager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -624,7 +612,7 @@ class ConnectionManager {
     this.playerData.clear();
     this.clientReadyResolvers.clear();
     this.earlyReadySignals.clear();
-    this.log('Connection Manager destroyed', 'info');
+    this.framework.log.info('Connection Manager destroyed');
   }
 }
 

@@ -7,7 +7,6 @@ class Whitelist {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // In-memory cache for fast lookups
     this.whitelistedPlayers = new Set();
@@ -20,7 +19,6 @@ class Whitelist {
    * Initialize whitelist module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
     // Load whitelist from database
@@ -34,10 +32,10 @@ class Whitelist {
 
     const count = this.whitelistedPlayers.size;
     const status = this.enabled ? 'ENABLED' : 'DISABLED';
-    this.log(`Whitelist module initialized - ${status} (${count} whitelisted players)`, 'info');
+    this.framework.log.info(`Whitelist module initialized - ${status} (${count} whitelisted players)`);
 
     if (!this.enabled) {
-      this.log('Whitelist is DISABLED - all players can connect. Set setr ngcore_whitelist_enabled "true" to enable.', 'warn');
+      this.framework.log.warn('Whitelist is DISABLED - all players can connect. Set setr ngcore_whitelist_enabled "true" to enable.');
     }
   }
 
@@ -54,9 +52,9 @@ class Whitelist {
         this.whitelistedPlayers.add(entry.identifier);
       }
 
-      this.log(`Loaded ${whitelist.length} whitelisted players from database`, 'debug');
+      this.framework.log.debug(`Loaded ${whitelist.length} whitelisted players from database`);
     } catch (error) {
-      this.log(`Failed to load whitelist: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load whitelist: ${error.message}`);
     }
   }
 
@@ -77,15 +75,13 @@ class Whitelist {
       const identifier = `${type}:${value}`;
 
       if (this.isWhitelisted(identifier)) {
-        this.log(`Player ${identifiers.license} whitelisted (${type})`, 'debug');
+        this.framework.log.debug(`Player ${identifiers.license} whitelisted (${type})`);
         return; // Allow join
       }
     }
 
     // Not whitelisted - deny join
-    this.log(`Player ${identifiers.license} denied (not whitelisted)`, 'warn', {
-      identifiers
-    });
+    this.framework.log.warn(`Player ${identifiers.license} denied (not whitelisted)`);
 
     deferrals.done(`You are not whitelisted on this server.\n\nYour identifiers:\n${
       Object.entries(identifiers).map(([k,v]) => `${k}: ${v}`).join('\n')
@@ -113,7 +109,7 @@ class Whitelist {
       // Add to memory cache
       this.whitelistedPlayers.add(identifier);
 
-      this.log(`Added ${identifier} to whitelist`, 'info', { addedBy, reason });
+      this.framework.log.info(`Added ${identifier} to whitelist`);
 
       return { success: true };
     } catch (error) {
@@ -121,7 +117,7 @@ class Whitelist {
         return { success: false, reason: 'already_whitelisted' };
       }
 
-      this.log(`Failed to add ${identifier} to whitelist: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to add ${identifier} to whitelist: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -144,11 +140,11 @@ class Whitelist {
       // Remove from memory cache
       this.whitelistedPlayers.delete(identifier);
 
-      this.log(`Removed ${identifier} from whitelist`, 'info', { removedBy, reason });
+      this.framework.log.info(`Removed ${identifier} from whitelist`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to remove ${identifier} from whitelist: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to remove ${identifier} from whitelist: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -178,7 +174,7 @@ class Whitelist {
         'SELECT identifier, added_by, added_at, reason FROM whitelist WHERE active = 1 ORDER BY added_at DESC'
       );
     } catch (error) {
-      this.log(`Failed to get whitelist: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to get whitelist: ${error.message}`);
       return [];
     }
   }
@@ -188,7 +184,7 @@ class Whitelist {
    */
   enable() {
     this.enabled = true;
-    this.log('Whitelist enabled', 'info');
+    this.framework.log.info('Whitelist enabled');
   }
 
   /**
@@ -196,7 +192,7 @@ class Whitelist {
    */
   disable() {
     this.enabled = false;
-    this.log('Whitelist disabled', 'warn');
+    this.framework.log.warn('Whitelist disabled');
   }
 
   /**
@@ -211,7 +207,7 @@ class Whitelist {
    */
   async reload() {
     await this.loadWhitelist();
-    this.log('Whitelist reloaded', 'info');
+    this.framework.log.info('Whitelist reloaded');
   }
 
   /**
@@ -230,16 +226,6 @@ class Whitelist {
     return identifiers;
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Whitelist] ${message}`);
-    }
-  }
 
   /**
    * Cleanup

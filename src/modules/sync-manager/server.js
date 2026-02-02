@@ -6,7 +6,6 @@
 class SyncManager {
   constructor(framework) {
     this.framework = framework;
-    this.logger = null;
 
     // World state
     this.state = {
@@ -57,7 +56,6 @@ class SyncManager {
    * Initialize sync manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
 
     // Load saved state from database (optional)
     await this.loadState();
@@ -81,8 +79,7 @@ class SyncManager {
       this.syncToPlayer(source);
     });
 
-    this.log('Sync manager module initialized', 'info', {
-      time: `${this.state.time.hour}:${String(this.state.time.minute).padStart(2, '0')}`,
+    this.framework.log.info('Sync manager module initialized').padStart(2, '0')}`,
       weather: this.state.weather.current
     });
   }
@@ -101,7 +98,7 @@ class SyncManager {
       this.advanceTime();
     }, 1000); // Update every second
 
-    this.log('Time progression started', 'debug');
+    this.framework.log.debug('Time progression started');
   }
 
   /**
@@ -111,7 +108,7 @@ class SyncManager {
     if (this.timeTimer) {
       clearInterval(this.timeTimer);
       this.timeTimer = null;
-      this.log('Time progression stopped', 'debug');
+      this.framework.log.debug('Time progression stopped');
     }
   }
 
@@ -148,7 +145,7 @@ class SyncManager {
 
     this.syncTimeToAll(transition);
 
-    this.log(`Time set to ${hour}:${String(minute).padStart(2, '0')}`, 'info');
+    this.framework.log.info(`Time set to ${hour}:${String(minute).padStart(2, '0')}`);
   }
 
   /**
@@ -163,7 +160,7 @@ class SyncManager {
       this.startTime();
     }
 
-    this.log(`Time ${frozen ? 'frozen' : 'unfrozen'}`, 'info');
+    this.framework.log.info(`Time ${frozen ? 'frozen' : 'unfrozen'}`);
   }
 
   /**
@@ -192,7 +189,7 @@ class SyncManager {
       this.cycleWeather();
     }, this.state.weather.cycleDuration);
 
-    this.log('Weather cycle started', 'debug');
+    this.framework.log.debug('Weather cycle started');
   }
 
   /**
@@ -202,7 +199,7 @@ class SyncManager {
     if (this.weatherTimer) {
       clearInterval(this.weatherTimer);
       this.weatherTimer = null;
-      this.log('Weather cycle stopped', 'debug');
+      this.framework.log.debug('Weather cycle stopped');
     }
   }
 
@@ -222,7 +219,7 @@ class SyncManager {
    */
   setWeather(weatherType, transition = true) {
     if (!this.weatherTypes.includes(weatherType)) {
-      this.log(`Invalid weather type: ${weatherType}`, 'warn');
+      this.framework.log.warn(`Invalid weather type: ${weatherType}`);
       return;
     }
 
@@ -238,11 +235,11 @@ class SyncManager {
         this.state.weather.transition = null;
       }, this.state.weather.transitionDuration);
 
-      this.log(`Weather transitioning to ${weatherType}`, 'debug');
+      this.framework.log.debug(`Weather transitioning to ${weatherType}`);
     } else {
       this.state.weather.current = weatherType;
       this.framework.fivem.emitNet('ng_core:weather-set', -1, weatherType);
-      this.log(`Weather set to ${weatherType}`, 'info');
+      this.framework.log.info(`Weather set to ${weatherType}`);
     }
   }
 
@@ -269,7 +266,7 @@ class SyncManager {
       this.stopWeatherCycle();
     }
 
-    this.log(`Weather cycle ${enabled ? 'enabled' : 'disabled'}`, 'info');
+    this.framework.log.info(`Weather cycle ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   // ================================
@@ -282,7 +279,7 @@ class SyncManager {
   setBlackout(enabled) {
     this.state.blackout = enabled;
     this.framework.fivem.emitNet('ng_core:blackout-set', -1, enabled);
-    this.log(`Blackout ${enabled ? 'enabled' : 'disabled'}`, 'info');
+    this.framework.log.info(`Blackout ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -302,7 +299,7 @@ class SyncManager {
   setTrafficDensity(density) {
     this.state.trafficDensity = Math.max(0, Math.min(1, density));
     this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
-    this.log(`Traffic density set to ${this.state.trafficDensity}`, 'info');
+    this.framework.log.info(`Traffic density set to ${this.state.trafficDensity}`);
   }
 
   /**
@@ -311,7 +308,7 @@ class SyncManager {
   setPedestrianDensity(density) {
     this.state.pedestrianDensity = Math.max(0, Math.min(1, density));
     this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
-    this.log(`Pedestrian density set to ${this.state.pedestrianDensity}`, 'info');
+    this.framework.log.info(`Pedestrian density set to ${this.state.pedestrianDensity}`);
   }
 
   // ================================
@@ -328,7 +325,7 @@ class SyncManager {
       this.syncTimeToAll(false);
     }, this.state.time.syncInterval);
 
-    this.log('Client sync started', 'debug');
+    this.framework.log.debug('Client sync started');
   }
 
   /**
@@ -338,7 +335,7 @@ class SyncManager {
     if (this.syncTimer) {
       clearInterval(this.syncTimer);
       this.syncTimer = null;
-      this.log('Client sync stopped', 'debug');
+      this.framework.log.debug('Client sync stopped');
     }
   }
 
@@ -404,10 +401,10 @@ class SyncManager {
         this.state.weather.current = data.weather || 'CLEAR';
         this.state.blackout = data.blackout === 1;
 
-        this.log('World state loaded from database', 'debug');
+        this.framework.log.debug('World state loaded from database');
       }
     } catch (error) {
-      this.log(`Failed to load world state: ${error.message}`, 'warn');
+      this.framework.log.warn(`Failed to load world state: ${error.message}`);
     }
   }
 
@@ -435,9 +432,9 @@ class SyncManager {
         ]
       );
 
-      this.log('World state saved to database', 'debug');
+      this.framework.log.debug('World state saved to database');
     } catch (error) {
-      this.log(`Failed to save world state: ${error.message}`, 'warn');
+      this.framework.log.warn(`Failed to save world state: ${error.message}`);
     }
   }
 
@@ -465,7 +462,7 @@ class SyncManager {
       this.state.pedestrianDensity = config.pedestrianDensity;
     }
 
-    this.log('Sync manager configuration updated', 'info');
+    this.framework.log.info('Sync manager configuration updated');
   }
 
   /**
@@ -481,16 +478,6 @@ class SyncManager {
     };
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Sync Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -500,7 +487,7 @@ class SyncManager {
     this.stopWeatherCycle();
     this.stopSync();
     await this.saveState();
-    this.log('Sync manager module destroyed', 'info');
+    this.framework.log.info('Sync manager module destroyed');
   }
 }
 

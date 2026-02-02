@@ -7,7 +7,6 @@ class AccessManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // In-memory access caches for fast lookups
     this.vehicleKeys = new Map(); // vehicleId => Set(identifiers)
@@ -35,7 +34,6 @@ class AccessManager {
    * Initialize access manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
     // Load all access data from database (skip if DB not available)
@@ -46,15 +44,10 @@ class AccessManager {
       await this.loadPropertyKeys();
       await this.loadGenericAccess();
     } else {
-      this.log('Database not available, starting without persistence', 'warn');
+      this.framework.log.warn('Database not available, starting without persistence');
     }
 
-    this.log('Access manager module initialized', 'info', {
-      vehicles: this.vehicleKeys.size,
-      doors: this.doorStates.size,
-      containers: this.containerAccess.size,
-      properties: this.propertyKeys.size
-    });
+    this.framework.log.info('Access manager module initialized');
   }
 
   // ================================
@@ -76,9 +69,9 @@ class AccessManager {
         this.vehicleKeys.get(key.vehicle_id).add(key.identifier);
       }
 
-      this.log(`Loaded ${keys.length} vehicle keys`, 'debug');
+      this.framework.log.debug(`Loaded ${keys.length} vehicle keys`);
     } catch (error) {
-      this.log(`Failed to load vehicle keys: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load vehicle keys: ${error.message}`);
     }
   }
 
@@ -106,14 +99,14 @@ class AccessManager {
       }
       this.vehicleKeys.get(vehicleId).add(identifier);
 
-      this.log(`Granted vehicle key: ${vehicleId} to ${identifier}`, 'info');
+      this.framework.log.info(`Granted vehicle key: ${vehicleId} to ${identifier}`);
 
       return { success: true };
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         return { success: false, reason: 'already_has_key' };
       }
-      this.log(`Failed to give vehicle key: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to give vehicle key: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -141,11 +134,11 @@ class AccessManager {
         }
       }
 
-      this.log(`Removed vehicle key: ${vehicleId} from ${identifier}`, 'info');
+      this.framework.log.info(`Removed vehicle key: ${vehicleId} from ${identifier}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to remove vehicle key: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to remove vehicle key: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
     }
   }
@@ -198,9 +191,9 @@ class AccessManager {
         });
       }
 
-      this.log(`Loaded ${doors.length} door states`, 'debug');
+      this.framework.log.debug(`Loaded ${doors.length} door states`);
     } catch (error) {
-      this.log(`Failed to load door states: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load door states: ${error.message}`);
     }
   }
 
@@ -217,10 +210,10 @@ class AccessManager {
 
       this.doorStates.set(doorId, { locked, owner });
 
-      this.log(`Registered door: ${doorId}`, 'debug');
+      this.framework.log.debug(`Registered door: ${doorId}`);
       return { success: true };
     } catch (error) {
-      this.log(`Failed to register door: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to register door: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -251,7 +244,7 @@ class AccessManager {
         [newState, identifier, doorId]
       );
 
-      this.log(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`, 'debug');
+      this.framework.log.debug(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`);
 
       // Sync to all clients
       this.framework.fivem.emitNet('ng_core:door-state-changed', -1, doorId, newState);
@@ -260,7 +253,7 @@ class AccessManager {
     } catch (error) {
       // Rollback cache on DB failure
       doorState.locked = !newState;
-      this.log(`Failed to toggle door: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to toggle door: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -301,9 +294,9 @@ class AccessManager {
         this.containerAccess.get(entry.container_id).add(entry.identifier);
       }
 
-      this.log(`Loaded ${access.length} container access entries`, 'debug');
+      this.framework.log.debug(`Loaded ${access.length} container access entries`);
     } catch (error) {
-      this.log(`Failed to load container access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load container access: ${error.message}`);
     }
   }
 
@@ -322,14 +315,14 @@ class AccessManager {
       }
       this.containerAccess.get(containerId).add(identifier);
 
-      this.log(`Granted container access: ${containerId} to ${identifier}`, 'info');
+      this.framework.log.info(`Granted container access: ${containerId} to ${identifier}`);
 
       return { success: true };
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         return { success: false, reason: 'already_has_access' };
       }
-      this.log(`Failed to grant container access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to grant container access: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -356,11 +349,11 @@ class AccessManager {
         }
       }
 
-      this.log(`Revoked container access: ${containerId} from ${identifier}`, 'info');
+      this.framework.log.info(`Revoked container access: ${containerId} from ${identifier}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to revoke container access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to revoke container access: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -392,9 +385,9 @@ class AccessManager {
         this.propertyKeys.get(key.property_id).add(key.identifier);
       }
 
-      this.log(`Loaded ${keys.length} property keys`, 'debug');
+      this.framework.log.debug(`Loaded ${keys.length} property keys`);
     } catch (error) {
-      this.log(`Failed to load property keys: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load property keys: ${error.message}`);
     }
   }
 
@@ -421,14 +414,14 @@ class AccessManager {
       }
       this.propertyKeys.get(propertyId).add(identifier);
 
-      this.log(`Granted property key: ${propertyId} to ${identifier}`, 'info');
+      this.framework.log.info(`Granted property key: ${propertyId} to ${identifier}`);
 
       return { success: true };
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         return { success: false, reason: 'already_has_key' };
       }
-      this.log(`Failed to give property key: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to give property key: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -455,11 +448,11 @@ class AccessManager {
         }
       }
 
-      this.log(`Removed property key: ${propertyId} from ${identifier}`, 'info');
+      this.framework.log.info(`Removed property key: ${propertyId} from ${identifier}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to remove property key: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to remove property key: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -492,9 +485,9 @@ class AccessManager {
         this.accessPermissions.get(key).add(entry.identifier);
       }
 
-      this.log(`Loaded ${access.length} generic access entries`, 'debug');
+      this.framework.log.debug(`Loaded ${access.length} generic access entries`);
     } catch (error) {
-      this.log(`Failed to load generic access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load generic access: ${error.message}`);
     }
   }
 
@@ -517,14 +510,14 @@ class AccessManager {
       }
       this.accessPermissions.get(key).add(identifier);
 
-      this.log(`Granted access: ${accessType}:${resourceId} to ${identifier}`, 'info');
+      this.framework.log.info(`Granted access: ${accessType}:${resourceId} to ${identifier}`);
 
       return { success: true };
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         return { success: false, reason: 'already_has_access' };
       }
-      this.log(`Failed to grant access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to grant access: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -552,11 +545,11 @@ class AccessManager {
         }
       }
 
-      this.log(`Revoked access: ${accessType}:${resourceId} from ${identifier}`, 'info');
+      this.framework.log.info(`Revoked access: ${accessType}:${resourceId} from ${identifier}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to revoke access: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to revoke access: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -598,7 +591,7 @@ class AccessManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Access manager configuration updated', 'info');
+    this.framework.log.info('Access manager configuration updated');
   }
 
   /**
@@ -610,7 +603,7 @@ class AccessManager {
     await this.loadContainerAccess();
     await this.loadPropertyKeys();
     await this.loadGenericAccess();
-    this.log('Access manager data reloaded', 'info');
+    this.framework.log.info('Access manager data reloaded');
   }
 
   /**
@@ -626,16 +619,6 @@ class AccessManager {
     };
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Access Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -646,7 +629,7 @@ class AccessManager {
     this.containerAccess.clear();
     this.propertyKeys.clear();
     this.accessPermissions.clear();
-    this.log('Access manager module destroyed', 'info');
+    this.framework.log.info('Access manager module destroyed');
   }
 }
 

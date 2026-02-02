@@ -6,7 +6,6 @@
 class SessionManager {
   constructor(framework) {
     this.framework = framework;
-    this.logger = null;
     this.instanceManager = null;
 
     // Session tracking
@@ -33,7 +32,6 @@ class SessionManager {
    * Initialize session manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.instanceManager = this.framework.getModule('instance-manager');
 
     // Handle player drops
@@ -41,7 +39,7 @@ class SessionManager {
       this.handlePlayerLeft(source);
     });
 
-    this.log('Session manager module initialized', 'info');
+    this.framework.log.info('Session manager module initialized');
   }
 
   /**
@@ -109,7 +107,7 @@ class SessionManager {
       metadata: definition.metadata || {}
     });
 
-    this.log(`Registered session type: ${type}`, 'debug');
+    this.framework.log.debug(`Registered session type: ${type}`);
   }
 
   /**
@@ -168,7 +166,7 @@ class SessionManager {
       await this.instanceManager.addPlayerToInstance(host, instanceId);
     }
 
-    this.log(`Created session: ${sessionId} (type: ${type}, host: ${host})`, 'info');
+    this.framework.log.info(`Created session: ${sessionId} (type: ${type}, host: ${host})`);
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:session-created', host, sessionId, type);
@@ -202,7 +200,7 @@ class SessionManager {
 
     this.sessions.delete(sessionId);
 
-    this.log(`Deleted session: ${sessionId} (reason: ${reason})`, 'info');
+    this.framework.log.info(`Deleted session: ${sessionId} (reason: ${reason})`);
 
     return { success: true };
   }
@@ -244,7 +242,7 @@ class SessionManager {
       await this.instanceManager.addPlayerToInstance(source, session.instanceId);
     }
 
-    this.log(`Player ${source} joined session ${sessionId}`, 'debug');
+    this.framework.log.debug(`Player ${source} joined session ${sessionId}`);
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:session-joined', source, sessionId, session.type);
@@ -276,7 +274,7 @@ class SessionManager {
       await this.instanceManager.removePlayerFromInstance(source);
     }
 
-    this.log(`Player ${source} left session ${sessionId} (${reason})`, 'debug');
+    this.framework.log.debug(`Player ${source} left session ${sessionId} (${reason})`);
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:session-left', source, sessionId, reason);
@@ -316,7 +314,7 @@ class SessionManager {
       await this.instanceManager.addPlayerToInstance(source, session.instanceId);
     }
 
-    this.log(`Player ${source} is now spectating session ${sessionId}`, 'debug');
+    this.framework.log.debug(`Player ${source} is now spectating session ${sessionId}`);
 
     this.framework.fivem.emitNet('ng_core:session-spectating', source, sessionId);
 
@@ -365,7 +363,7 @@ class SessionManager {
     session.startedAt = Date.now();
     session.lastActivity = Date.now();
 
-    this.log(`Session ${sessionId} started`, 'info');
+    this.framework.log.info(`Session ${sessionId} started`);
 
     this.broadcastToSession(sessionId, 'ng_core:session-started', sessionId);
 
@@ -385,7 +383,7 @@ class SessionManager {
     session.finishedAt = Date.now();
     session.data.results = results;
 
-    this.log(`Session ${sessionId} ended`, 'info');
+    this.framework.log.info(`Session ${sessionId} ended`);
 
     this.broadcastToSession(sessionId, 'ng_core:session-ended', sessionId, results);
 
@@ -502,19 +500,9 @@ class SessionManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Session manager configuration updated', 'info');
+    this.framework.log.info('Session manager configuration updated');
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Session Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -528,7 +516,7 @@ class SessionManager {
     this.sessions.clear();
     this.playerSessions.clear();
 
-    this.log('Session manager module destroyed', 'info');
+    this.framework.log.info('Session manager module destroyed');
   }
 }
 

@@ -7,7 +7,6 @@ class ContainerManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
     this.itemRegistry = null;
 
     // Container cache
@@ -37,7 +36,6 @@ class ContainerManager {
    * Initialize container manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
     this.itemRegistry = this.framework.getModule('item-registry');
 
@@ -46,7 +44,7 @@ class ContainerManager {
       this.startAutoSave();
     }
 
-    this.log('Container manager module initialized', 'info');
+    this.framework.log.info('Container manager module initialized');
   }
 
   /**
@@ -84,11 +82,11 @@ class ContainerManager {
 
       this.containers.set(containerId, container);
 
-      this.log(`Created container: ${containerId} (type: ${type}, owner: ${owner})`, 'debug');
+      this.framework.log.debug(`Created container: ${containerId} (type: ${type}, owner: ${owner})`);
 
       return { success: true, containerId };
     } catch (error) {
-      this.log(`Failed to create container: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to create container: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -153,11 +151,11 @@ class ContainerManager {
 
       this.containers.set(containerId, container);
 
-      this.log(`Loaded container: ${containerId}`, 'debug');
+      this.framework.log.debug(`Loaded container: ${containerId}`);
 
       return { success: true, container };
     } catch (error) {
-      this.log(`Failed to load container: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load container: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -204,11 +202,11 @@ class ContainerManager {
         );
       }
 
-      this.log(`Saved container: ${containerId}`, 'debug');
+      this.framework.log.debug(`Saved container: ${containerId}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to save container: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to save container: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -223,11 +221,11 @@ class ContainerManager {
 
       this.containers.delete(containerId);
 
-      this.log(`Deleted container: ${containerId}`, 'info');
+      this.framework.log.info(`Deleted container: ${containerId}`);
 
       return { success: true };
     } catch (error) {
-      this.log(`Failed to delete container: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to delete container: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -318,7 +316,7 @@ class ContainerManager {
 
     await this.saveContainer(containerId);
 
-    this.log(`Added item to container ${containerId}: ${itemId} x${quantity}`, 'debug');
+    this.framework.log.debug(`Added item to container ${containerId}: ${itemId} x${quantity}`);
 
     return { success: true, slot };
   }
@@ -371,7 +369,7 @@ class ContainerManager {
 
     await this.saveContainer(containerId);
 
-    this.log(`Removed item from container ${containerId}: ${item.itemId} x${quantity}`, 'debug');
+    this.framework.log.debug(`Removed item from container ${containerId}: ${item.itemId} x${quantity}`);
 
     return { success: true, itemId: item.itemId, quantity, metadata: item.metadata };
   }
@@ -462,7 +460,7 @@ class ContainerManager {
       return addResult;
     }
 
-    this.log(`Transferred item: ${removeResult.itemId} x${removeResult.quantity} from ${fromContainerId} to ${toContainerId}`, 'debug');
+    this.framework.log.debug(`Transferred item: ${removeResult.itemId} x${removeResult.quantity} from ${fromContainerId} to ${toContainerId}`);
 
     return { success: true };
   }
@@ -530,7 +528,7 @@ class ContainerManager {
 
     await this.saveContainer(containerId);
 
-    this.log(`Cleared container: ${containerId}`, 'info');
+    this.framework.log.info(`Cleared container: ${containerId}`);
 
     return { success: true };
   }
@@ -582,7 +580,7 @@ class ContainerManager {
       this.saveAllContainers();
     }, this.config.autoSaveInterval);
 
-    this.log('Auto-save started', 'debug');
+    this.framework.log.debug('Auto-save started');
   }
 
   /**
@@ -592,7 +590,7 @@ class ContainerManager {
     if (this.autoSaveTimer) {
       clearInterval(this.autoSaveTimer);
       this.autoSaveTimer = null;
-      this.log('Auto-save stopped', 'debug');
+      this.framework.log.debug('Auto-save stopped');
     }
   }
 
@@ -606,7 +604,7 @@ class ContainerManager {
       await this.saveContainer(containerId);
     }
 
-    this.log(`Auto-saved ${containerIds.length} containers`, 'debug');
+    this.framework.log.debug(`Auto-saved ${containerIds.length} containers`);
   }
 
   /**
@@ -614,7 +612,7 @@ class ContainerManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Container manager configuration updated', 'info');
+    this.framework.log.info('Container manager configuration updated');
   }
 
   /**
@@ -627,16 +625,6 @@ class ContainerManager {
     };
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Container Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -646,7 +634,7 @@ class ContainerManager {
     await this.saveAllContainers();
     this.containers.clear();
     this.playerContainers.clear();
-    this.log('Container manager module destroyed', 'info');
+    this.framework.log.info('Container manager module destroyed');
   }
 }
 

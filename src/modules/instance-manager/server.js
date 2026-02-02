@@ -7,7 +7,6 @@ class InstanceManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // Instance tracking
     this.instances = new Map(); // instanceId => Instance object
@@ -33,7 +32,6 @@ class InstanceManager {
    * Initialize instance manager module
    */
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
     // Handle player drops
@@ -41,7 +39,7 @@ class InstanceManager {
       this.handlePlayerLeft(source);
     });
 
-    this.log('Instance manager module initialized', 'info');
+    this.framework.log.info('Instance manager module initialized');
   }
 
   /**
@@ -74,12 +72,7 @@ class InstanceManager {
     SetRoutingBucketPopulationEnabled(routingBucket, false); // Disable auto-population
     SetRoutingBucketEntityLockdownMode(routingBucket, 'relaxed'); // Allow entity creation
 
-    this.log(`Created instance: ${instanceId} (type: ${type}, bucket: ${routingBucket})`, 'info', {
-      instanceId,
-      type,
-      owner,
-      routingBucket
-    });
+    this.framework.log.info(`Created instance: ${instanceId} (type: ${type}, bucket: ${routingBucket})`);
 
     return { success: true, instanceId, routingBucket };
   }
@@ -113,7 +106,7 @@ class InstanceManager {
     this.instances.delete(instanceId);
     this.routingBuckets.delete(instance.routingBucket);
 
-    this.log(`Deleted instance: ${instanceId}`, 'info', { instanceId, force });
+    this.framework.log.info(`Deleted instance: ${instanceId}`);
 
     return { success: true };
   }
@@ -151,11 +144,7 @@ class InstanceManager {
     // Set player's routing bucket
     SetPlayerRoutingBucket(source, instance.routingBucket);
 
-    this.log(`Player ${source} joined instance ${instanceId}`, 'debug', {
-      source,
-      instanceId,
-      routingBucket: instance.routingBucket
-    });
+    this.framework.log.debug(`Player ${source} joined instance ${instanceId}`);
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:instance-joined', source, instanceId, instance.type);
@@ -194,10 +183,7 @@ class InstanceManager {
     // Return to public world
     SetPlayerRoutingBucket(source, this.config.defaultBucket);
 
-    this.log(`Player ${source} left instance ${instanceId}`, 'debug', {
-      source,
-      instanceId
-    });
+    this.framework.log.debug(`Player ${source} left instance ${instanceId}`);
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:instance-left', source, instanceId);
@@ -265,7 +251,7 @@ class InstanceManager {
     }
 
     instance.locked = true;
-    this.log(`Instance ${instanceId} locked`, 'debug');
+    this.framework.log.debug(`Instance ${instanceId} locked`);
 
     return { success: true };
   }
@@ -280,7 +266,7 @@ class InstanceManager {
     }
 
     instance.locked = false;
-    this.log(`Instance ${instanceId} unlocked`, 'debug');
+    this.framework.log.debug(`Instance ${instanceId} unlocked`);
 
     return { success: true };
   }
@@ -322,7 +308,7 @@ class InstanceManager {
     // Send invitation to client
     this.framework.fivem.emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
 
-    this.log(`Player ${source} invited to instance ${instanceId}`, 'debug');
+    this.framework.log.debug(`Player ${source} invited to instance ${instanceId}`);
 
     return { success: true };
   }
@@ -367,7 +353,7 @@ class InstanceManager {
       const instance = this.instances.get(instanceId);
 
       if (instance && instance.players.size === 0) {
-        this.log(`Auto-cleaning empty instance: ${instanceId}`, 'debug');
+        this.framework.log.debug(`Auto-cleaning empty instance: ${instanceId}`);
         this.deleteInstance(instanceId);
       }
     }, this.config.autoCleanupDelay);
@@ -434,19 +420,9 @@ class InstanceManager {
    */
   configure(config) {
     this.config = { ...this.config, ...config };
-    this.log('Instance manager configuration updated', 'info');
+    this.framework.log.info('Instance manager configuration updated');
   }
 
-  /**
-   * Log helper
-   */
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    } else {
-      this.framework.log[level](`[Instance Manager] ${message}`);
-    }
-  }
 
   /**
    * Cleanup
@@ -462,7 +438,7 @@ class InstanceManager {
     this.routingBuckets.clear();
     this.freeBuckets = [];
 
-    this.log('Instance manager module destroyed', 'info');
+    this.framework.log.info('Instance manager module destroyed');
   }
 }
 
