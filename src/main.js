@@ -342,8 +342,10 @@ on('onResourceStop', async (resourceName) => {
     await Framework.destroy();
 });
 
-// Register kernel resource name for bridge auto-detection
-SetConvar('ng_kernel_resource', GetCurrentResourceName());
+// Register kernel resource name for bridge auto-detection (server only)
+if (typeof SetConvar !== 'undefined') {
+    SetConvar('ng_kernel_resource', GetCurrentResourceName());
+}
 
 // FiveM exports
 exports('GetFramework', () => Framework);
