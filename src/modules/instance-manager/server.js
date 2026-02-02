@@ -6,7 +6,6 @@
 class InstanceManager {
   constructor(framework) {
     this.framework = framework;
-    this.db = null;
 
     // Instance tracking
     this.instances = new Map(); // instanceId => Instance object
@@ -32,11 +31,22 @@ class InstanceManager {
    * Initialize instance manager module
    */
   async init() {
-    this.db = this.framework.getModule('database');
-
     // Handle player drops
-    on('playerDropped', () => {
+    this.framework.fivem.on('playerDropped', () => {
       this.handlePlayerLeft(source);
+    });
+
+    // Handle client-initiated actions
+    this.framework.onNet('ng_core:instance-request-join', (instanceId) => {
+      this.addPlayerToInstance(source, instanceId);
+    });
+
+    this.framework.onNet('ng_core:instance-request-leave', () => {
+      this.removePlayerFromInstance(source);
+    });
+
+    this.framework.onNet('ng_core:instance-accept-invite', (instanceId) => {
+      this.addPlayerToInstance(source, instanceId);
     });
 
     this.framework.log.info('Instance manager module initialized');
@@ -92,9 +102,9 @@ class InstanceManager {
       return { success: false, reason: 'instance_not_empty' };
     }
 
-    // Remove all players if force
+    // Remove all players if force (copy Set to avoid modification during iteration)
     if (force) {
-      for (const source of instance.players) {
+      for (const source of [...instance.players]) {
         await this.removePlayerFromInstance(source);
       }
     }
@@ -148,11 +158,6 @@ class InstanceManager {
 
     // Emit event
     this.framework.fivem.emitNet('ng_core:instance-joined', source, instanceId, instance.type);
-
-    // Trigger cleanup check
-    if (this.config.autoCleanupEmpty) {
-      this.scheduleCleanupCheck(instanceId);
-    }
 
     return { success: true, routingBucket: instance.routingBucket };
   }
@@ -374,7 +379,7 @@ class InstanceManager {
    * Generate unique instance ID
    */
   generateInstanceId() {
-    return `instance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `instance_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**

@@ -157,8 +157,7 @@ class InstanceManagerClient {
   }
 }
 
-// Export to global scope for framework (FiveM client environment)
-if (typeof global !== "undefined") { global.NgModule_instance_manager = InstanceManagerClient; }
+module.exports = InstanceManagerClient;
 
 // Self-register
 global.Framework.register('instance-manager', new InstanceManagerClient(global.Framework), 12);
