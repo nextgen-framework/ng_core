@@ -32,7 +32,7 @@ class TickManager {
    */
   async init() {
     // Cleanup on resource stop
-    on('onResourceStop', (resourceName) => {
+    this.framework.fivem.on('onResourceStop', (resourceName) => {
       if (resourceName === GetCurrentResourceName()) {
         this.destroyAll();
       }
