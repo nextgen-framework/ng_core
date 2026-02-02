@@ -27,7 +27,7 @@ class HardcapModule {
    */
   setupEventHandlers() {
     // Handle player connecting
-    on('playerConnecting', (name, setKickReason, deferrals) => {
+    this.framework.fivem.on('playerConnecting', (name, setKickReason, deferrals) => {
 
       // Check if server is at or over the limit
       if (this.playerCount >= this.maxClients) {
@@ -52,18 +52,19 @@ class HardcapModule {
     });
 
     // Handle player activation (when fully loaded)
-    this.framework.onNet('hardcap:playerActivated', () => {
+    this.framework.fivem.onNet('hardcap:playerActivated', () => {
+      const src = source;
 
-      if (!this.activePlayers.has(source)) {
+      if (!this.activePlayers.has(src)) {
         this.playerCount++;
-        this.activePlayers.set(source, true);
+        this.activePlayers.set(src, true);
         console.log(`[NextGen] [Hardcap] Player activated - Total: ${this.playerCount}/${this.maxClients}`);
       }
     });
 
     // Handle player disconnect
-    on('playerDropped', (reason) => {
-      const src = global.source;
+    this.framework.fivem.on('playerDropped', (reason) => {
+      const src = source;
       if (this.activePlayers.has(src)) {
         this.playerCount--;
         this.activePlayers.delete(src);
@@ -91,6 +92,14 @@ class HardcapModule {
    */
   isFull() {
     return this.playerCount >= this.maxClients;
+  }
+
+  /**
+   * Cleanup
+   */
+  destroy() {
+    this.activePlayers.clear();
+    this.playerCount = 0;
   }
 }
 

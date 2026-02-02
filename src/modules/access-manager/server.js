@@ -38,12 +38,16 @@ class AccessManager {
     this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
 
-    // Load all access data from database
-    await this.loadVehicleKeys();
-    await this.loadDoorStates();
-    await this.loadContainerAccess();
-    await this.loadPropertyKeys();
-    await this.loadGenericAccess();
+    // Load all access data from database (skip if DB not available)
+    if (this.db && this.db.isConnected()) {
+      await this.loadVehicleKeys();
+      await this.loadDoorStates();
+      await this.loadContainerAccess();
+      await this.loadPropertyKeys();
+      await this.loadGenericAccess();
+    } else {
+      this.log('Database not available, starting without persistence', 'warn');
+    }
 
     this.log('Access manager module initialized', 'info', {
       vehicles: this.vehicleKeys.size,
@@ -238,13 +242,14 @@ class AccessManager {
 
     const newState = !doorState.locked;
 
+    // Optimistic cache update (prevents race condition on concurrent calls)
+    doorState.locked = newState;
+
     try {
       await this.db.execute(
         'UPDATE door_states SET locked = ?, last_toggled_at = NOW(), last_toggled_by = ? WHERE door_id = ?',
         [newState, identifier, doorId]
       );
-
-      doorState.locked = newState;
 
       this.log(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`, 'debug');
 
@@ -253,6 +258,8 @@ class AccessManager {
 
       return { success: true, locked: newState };
     } catch (error) {
+      // Rollback cache on DB failure
+      doorState.locked = !newState;
       this.log(`Failed to toggle door: ${error.message}`, 'error');
       return { success: false, error: error.message };
     }
@@ -262,7 +269,9 @@ class AccessManager {
    * Get door state
    */
   getDoorState(doorId) {
-    return this.doorStates.get(doorId) || { locked: this.config.defaultLockState, owner: null };
+    const state = this.doorStates.get(doorId);
+    if (!state) return { locked: this.config.defaultLockState, owner: null };
+    return { locked: state.locked, owner: state.owner };
   }
 
   /**
@@ -472,7 +481,7 @@ class AccessManager {
    */
   async loadGenericAccess() {
     try {
-      const access = await this.db.query('SELECT access_type, resource_id, identifier FROM generic_access');
+      const access = await this.db.query('SELECT access_type, resource_id, identifier, metadata FROM generic_access');
 
       this.accessPermissions.clear();
       for (const entry of access) {
@@ -494,9 +503,12 @@ class AccessManager {
    */
   async grantAccess(accessType, resourceId, identifier, grantedBy = 'system', metadata = {}) {
     try {
+      let metadataJson = '{}';
+      try { metadataJson = JSON.stringify(metadata); } catch (e) { /* circular or invalid */ }
+
       await this.db.execute(
         'INSERT INTO generic_access (access_type, resource_id, identifier, granted_by, granted_at, metadata) VALUES (?, ?, ?, ?, NOW(), ?)',
-        [accessType, resourceId, identifier, grantedBy, JSON.stringify(metadata)]
+        [accessType, resourceId, identifier, grantedBy, metadataJson]
       );
 
       const key = `${accessType}:${resourceId}`;
@@ -566,7 +578,10 @@ class AccessManager {
 
     for (const [key, identifiers] of this.accessPermissions.entries()) {
       if (identifiers.has(identifier)) {
-        const [accessType, resourceId] = key.split(':');
+        const idx = key.indexOf(':');
+        if (idx === -1) continue;
+        const accessType = key.slice(0, idx);
+        const resourceId = key.slice(idx + 1);
         playerAccess.push({ accessType, resourceId });
       }
     }

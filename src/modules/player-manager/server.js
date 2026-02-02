@@ -23,7 +23,7 @@ class PlayerManager {
    */
   registerEvents() {
     // Player connecting
-    on('playerConnecting', async (name, setKickReason, deferrals) => {
+    this.framework.fivem.on('playerConnecting', async (name, setKickReason, deferrals) => {
       const playerSource = source;
       deferrals.defer();
       deferrals.update('Checking with framework...');
@@ -33,7 +33,6 @@ class PlayerManager {
         await this.framework.events.pipe(this.framework.constants.Hooks.BEFORE_PLAYER_JOIN, { source: playerSource, deferrals });
 
         // Queue/connection-manager handles deferrals - don't call done() here
-        // deferrals.done(); will be called by queue or connection-manager
       } catch (error) {
         this.framework.log.error(`Player connection error: ${error.message}`);
         deferrals.done(error.message);
@@ -41,23 +40,46 @@ class PlayerManager {
     });
 
     // Player joined
-    on('playerJoining', async () => {
-      // Capture source before async operations to avoid scope issues
+    this.framework.fivem.on('playerJoining', () => {
       const playerSource = source;
-      await this.create(playerSource);
-      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, playerSource);
-      await this.framework.events.pipe(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, playerSource);
+      this.handlePlayerJoining(playerSource);
     });
 
     // Player dropped
-    on('playerDropped', async (reason) => {
+    this.framework.fivem.on('playerDropped', (reason) => {
       const playerSource = source;
+      this.handlePlayerDropped(playerSource, reason);
+    });
+  }
 
+  /**
+   * Handle player joining - create player and fire hooks
+   * @param {number} playerSource
+   */
+  async handlePlayerJoining(playerSource) {
+    try {
+      await this.create(playerSource);
+      this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_CONNECTED, playerSource);
+      await this.framework.events.pipe(this.framework.constants.Hooks.AFTER_PLAYER_JOIN, playerSource);
+    } catch (error) {
+      this.framework.log.error(`Player joining error for ${playerSource}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle player dropped - fire hooks only if player exists in pool
+   * @param {number} playerSource
+   * @param {string} reason
+   */
+  async handlePlayerDropped(playerSource, reason) {
+    const playerExists = this.players.has(playerSource);
+
+    if (playerExists) {
       await this.framework.events.pipe(this.framework.constants.Hooks.BEFORE_PLAYER_LEAVE, { source: playerSource, reason });
       await this.remove(playerSource);
       this.framework.eventBus.emit(this.framework.constants.Events.PLAYER_DROPPED, playerSource, reason);
       await this.framework.events.pipe(this.framework.constants.Hooks.AFTER_PLAYER_LEAVE, { source: playerSource, reason });
-    });
+    }
   }
 
   /**
@@ -72,7 +94,13 @@ class PlayerManager {
     }
 
     const player = new PlayerClass(source, this.framework);
-    await player.init();
+
+    try {
+      await player.init();
+    } catch (error) {
+      this.framework.log.error(`Player ${source} init failed: ${error.message}`);
+      return null;
+    }
 
     this.players.set(source, player);
     this.framework.log.info(`Player ${source} added to pool`);
@@ -172,6 +200,21 @@ class PlayerManager {
   forEach(callback) {
     this.players.forEach(callback);
   }
+
+  /**
+   * Cleanup - destroy all players and clear state
+   */
+  async destroy() {
+    for (const [src, player] of this.players) {
+      try {
+        await player.destroy();
+      } catch (e) {
+        this.framework.log.error(`Error destroying player ${src}: ${e.message}`);
+      }
+    }
+    this.players.clear();
+    this.framework.log.info('Player Manager destroyed');
+  }
 }
 
 /**
@@ -204,14 +247,19 @@ class PlayerClass {
     const numIdentifiers = GetNumPlayerIdentifiers(this.source);
     for (let i = 0; i < numIdentifiers; i++) {
       const identifier = GetPlayerIdentifier(this.source, i);
-      const [type, value] = identifier.split(':');
+      if (!identifier) continue;
+      const idx = identifier.indexOf(':');
+      if (idx === -1) continue;
+      const type = identifier.slice(0, idx);
+      const value = identifier.slice(idx + 1);
       this.identifiers[type] = value;
     }
 
-    // Parse endpoints
-    const numEndpoints = GetNumPlayerTokens(this.source);
-    for (let i = 0; i < numEndpoints; i++) {
-      this.endpoints.push(GetPlayerToken(this.source, i));
+    // Parse tokens
+    const numTokens = GetNumPlayerTokens(this.source);
+    for (let i = 0; i < numTokens; i++) {
+      const token = GetPlayerToken(this.source, i);
+      if (token) this.endpoints.push(token);
     }
 
     // Set initial ping

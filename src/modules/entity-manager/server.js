@@ -25,9 +25,14 @@ class EntityManager {
    */
   async create(type, data = {}) {
     const entityId = this.generateEntityId();
-    const entity = new Entity(entityId, type, data, this.framework);
+    const entity = new ManagedEntity(entityId, type, data, this.framework);
 
-    await entity.init();
+    try {
+      await entity.init();
+    } catch (error) {
+      this.framework.log.error(`Entity ${entityId} (${type}) init failed: ${error.message}`);
+      return null;
+    }
 
     this.entities.set(entityId, entity);
     this.framework.log.info(`Entity ${entityId} (${type}) created`);
@@ -122,13 +127,29 @@ class EntityManager {
   generateEntityId() {
     return `entity_${++this.entityIdCounter}_${Date.now()}`;
   }
+
+  /**
+   * Cleanup - destroy all entities and clear state
+   */
+  async destroy() {
+    for (const [entityId, entity] of this.entities) {
+      try {
+        await entity.destroy();
+      } catch (e) {
+        this.framework.log.error(`Error destroying entity ${entityId}: ${e.message}`);
+      }
+    }
+    this.entities.clear();
+    this.framework.log.info('Entity Manager destroyed');
+  }
 }
 
 /**
- * Entity class - represents a generic networked entity
+ * ManagedEntity class - represents a generic networked entity
+ * Named ManagedEntity to avoid collision with FiveM global Entity()
  * Can be extended by plugins for custom entity types
  */
-class Entity {
+class ManagedEntity {
   constructor(entityId, type, data, framework) {
     this.id = entityId;
     this.type = type;
@@ -159,11 +180,17 @@ class Entity {
    * Destroy entity
    */
   async destroy() {
-    // If entity has a network ID, delete it
-    if (this.networkId && DoesEntityExist(NetworkGetEntityFromNetworkId(this.networkId))) {
-      DeleteEntity(NetworkGetEntityFromNetworkId(this.networkId));
+    // If entity has a network ID, delete the FiveM entity
+    if (this.networkId) {
+      const handle = NetworkGetEntityFromNetworkId(this.networkId);
+      if (handle && DoesEntityExist(handle)) {
+        DeleteEntity(handle);
+      }
     }
 
+    this.networkId = null;
+    this.handle = null;
+    this.stateBag = null;
     this.metadata = {};
     this.framework.log.info(`Entity ${this.id} destroyed`);
   }
@@ -176,9 +203,9 @@ class Entity {
     this.networkId = networkId;
     this.handle = NetworkGetEntityFromNetworkId(networkId);
 
-    // Get state bag for this entity
-    if (this.handle) {
-      this.stateBag = Entity.state[this.handle];
+    // Get state bag for this entity (uses FiveM global Entity(), not this class)
+    if (this.handle && DoesEntityExist(this.handle)) {
+      this.stateBag = global.Entity(this.handle).state;
     }
   }
 

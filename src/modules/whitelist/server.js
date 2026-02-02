@@ -240,6 +240,13 @@ class Whitelist {
       this.framework.log[level](`[Whitelist] ${message}`);
     }
   }
+
+  /**
+   * Cleanup
+   */
+  destroy() {
+    this.whitelistedPlayers.clear();
+  }
 }
 
 module.exports = Whitelist;

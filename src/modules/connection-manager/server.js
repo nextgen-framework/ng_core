@@ -12,6 +12,9 @@ class ConnectionManager {
     this.playerStages = new Map(); // license -> { source, stage, ...stage data }
     this.playerData = new Map();   // license -> player data cache
     this.stuckClientMonitorInterval = null; // Store interval for cleanup
+
+    // Cache for early client-ready signals (before waitForClientReady sets up resolver)
+    this.earlyReadySignals = new Set();
   }
 
   /**
@@ -22,12 +25,13 @@ class ConnectionManager {
     this.clientReadyResolvers = new Map();
 
     // Handle player drops
-    on('playerDropped', (reason) => {
-      this.handlePlayerDropped(global.source, reason);
+    this.framework.fivem.on('playerDropped', (reason) => {
+      const src = source;
+      this.handlePlayerDropped(src, reason);
     });
 
     // Handle client ready signals
-    this.framework.onNet('ng_core:client-ready', () => {
+    this.framework.fivem.onNet('ng_core:client-ready', () => {
       const clientSource = source;
 
       // Get player identifiers to match against waiting resolvers
@@ -36,16 +40,26 @@ class ConnectionManager {
 
       console.log(`[NextGen] [Connection] Received client-ready signal from ${clientSource} (${license})`);
 
-      // Find resolver by license
-      if (license) {
-        const resolver = this.clientReadyResolvers.get(license);
-        if (resolver) {
-          resolver(true);
-        } else {
-          console.log(`[NextGen] [Connection] No resolver found for license ${license}`);
-        }
-      } else {
+      if (!license) {
         console.log(`[NextGen] [Connection] Could not get license for source ${clientSource}`);
+        return;
+      }
+
+      // Verify player is in WAITING_CLIENT stage (prevent out-of-order or spoofed signals)
+      const currentStage = this.getPlayerStageByLicense(license);
+      if (currentStage !== this.framework.constants.PlayerStage.WAITING_CLIENT) {
+        console.log(`[NextGen] [Connection] Ignoring client-ready from ${license} - wrong stage: ${currentStage}`);
+        return;
+      }
+
+      // Find resolver by license
+      const resolver = this.clientReadyResolvers.get(license);
+      if (resolver) {
+        resolver(true);
+      } else {
+        // Resolver not set up yet - cache the signal for waitForClientReady
+        this.earlyReadySignals.add(license);
+        console.log(`[NextGen] [Connection] Cached early client-ready signal for ${license}`);
       }
     });
 
@@ -97,9 +111,7 @@ class ConnectionManager {
           }
 
           // Cleanup
-          this.playerStages.delete(license);
-          this.playerData.delete(license);
-          this.clientReadyResolvers.delete(license);
+          this.cleanupPlayer(license);
         }
       }
     }, 10000); // Check every 10 seconds
@@ -163,7 +175,7 @@ class ConnectionManager {
       // Check if player still connected
       if (!this.isPlayerConnected(source)) {
         console.log(`[NextGen] [Connection] Player ${license} disconnected before loading stage`);
-        this.playerStages.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
@@ -180,15 +192,14 @@ class ConnectionManager {
       if (loadingResult === false || (loadingResult && loadingResult.success === false)) {
         const reason = loadingResult?.reason || loadingResult?.error || 'Failed to load player data';
         deferrals.done(reason);
-        this.playerStages.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
       // Check if player still connected after loading
       if (!this.isPlayerConnected(source)) {
         console.log(`[NextGen] [Connection] Player ${license} disconnected during loading stage`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
@@ -200,8 +211,7 @@ class ConnectionManager {
       // Check if player still connected before permissions
       if (!this.isPlayerConnected(source)) {
         console.log(`[NextGen] [Connection] Player ${license} disconnected before permission check`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
@@ -220,8 +230,7 @@ class ConnectionManager {
       this.log(`Connection process failed for ${license || source}: ${error.message}`, 'error');
       deferrals.done(`Connection failed: ${error.message}`);
       if (license) {
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
       }
       return false;
     }
@@ -237,7 +246,7 @@ class ConnectionManager {
       const license = identifiers.license;
 
       // Get the startedAt timestamp from existing stage info
-      const oldStageInfo = this.playerStages.get(license) || this.playerStages.get(oldSource);
+      const oldStageInfo = this.playerStages.get(license);
       const startedAt = oldStageInfo?.startedAt || Date.now();
       const playerName = oldStageInfo?.playerName || 'Unknown';
 
@@ -266,11 +275,6 @@ class ConnectionManager {
       const actualPlayerName = player.getName ? player.getName() : this.getPlayerName(currentSource);
       console.log(`[NextGen] [Connection] Continuing connection process for ${license} (${actualPlayerName}, source ${currentSource}, was ${oldSource}, found after ${attempts * 100}ms)...`);
 
-      // Clean up old source-based tracking if exists
-      if (this.playerStages.has(oldSource)) {
-        this.playerStages.delete(oldSource);
-      }
-
       // Set stage using license with actual player name
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CONNECTING, { startedAt, playerName: actualPlayerName });
 
@@ -284,9 +288,8 @@ class ConnectionManager {
       if (!clientReadyResult.success) {
         currentSource = this.getCurrentSource(license) || currentSource;
         console.log(`[NextGen] [Connection] Client ${license} failed to become ready: ${clientReadyResult.reason}`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
-        if (currentSource) {
+        this.cleanupPlayer(license);
+        if (currentSource && this.isPlayerConnected(currentSource)) {
           DropPlayer(currentSource, clientReadyResult.reason || 'Client initialization failed');
         }
         return false;
@@ -311,9 +314,8 @@ class ConnectionManager {
         currentSource = this.getCurrentSource(license) || currentSource;
         const reason = permissionResult?.reason || permissionResult?.error || 'Permission check failed';
         console.log(`[NextGen] [Connection] Permission check failed for ${license}: ${reason}`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
-        if (currentSource) {
+        this.cleanupPlayer(license);
+        if (currentSource && this.isPlayerConnected(currentSource)) {
           DropPlayer(currentSource, reason);
         }
         return false;
@@ -323,8 +325,7 @@ class ConnectionManager {
       currentSource = this.getCurrentSource(license);
       if (!currentSource || !this.isPlayerConnected(currentSource)) {
         console.log(`[NextGen] [Connection] Player ${license} disconnected during permission check`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
@@ -343,9 +344,8 @@ class ConnectionManager {
         currentSource = this.getCurrentSource(license) || currentSource;
         const reason = readyResult?.reason || readyResult?.error || 'Spawn preparation failed';
         console.log(`[NextGen] [Connection] Spawn preparation failed for ${license}: ${reason}`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
-        if (currentSource) {
+        this.cleanupPlayer(license);
+        if (currentSource && this.isPlayerConnected(currentSource)) {
           DropPlayer(currentSource, reason);
         }
         return false;
@@ -355,8 +355,7 @@ class ConnectionManager {
       currentSource = this.getCurrentSource(license);
       if (!currentSource || !this.isPlayerConnected(currentSource)) {
         console.log(`[NextGen] [Connection] Player ${license} disconnected before spawn`);
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
         return false;
       }
 
@@ -380,52 +379,12 @@ class ConnectionManager {
       return true;
     } catch (error) {
       console.log(`[NextGen] [Connection] Post-connection process failed for ${license}: ${error.message}`);
-      this.playerStages.delete(license);
-      this.playerData.delete(license);
+      this.cleanupPlayer(license);
       const currentSource = this.getCurrentSource(license);
-      if (currentSource) {
+      if (currentSource && this.isPlayerConnected(currentSource)) {
         DropPlayer(currentSource, `Connection failed: ${error.message}`);
       }
       return false;
-    }
-  }
-
-  /**
-   * Execute a connection stage
-   */
-  async executeStage(source, stage, hookName, data) {
-    try {
-      this.setPlayerStage(source, stage, data);
-
-      const hookResult = await this.framework.events.pipe(hookName, data);
-
-      // Check if any hook rejected the connection
-      if (hookResult === false) {
-        return {
-          success: false,
-          reason: 'Stage rejected by hook'
-        };
-      }
-
-      // If hook returned an object with success: false, reject
-      if (hookResult && hookResult.success === false) {
-        return {
-          success: false,
-          reason: hookResult.reason || hookResult.error || 'Stage failed'
-        };
-      }
-
-      // Stage passed
-      return {
-        success: true,
-        data: hookResult || {}
-      };
-    } catch (error) {
-      this.log(`Stage ${stage} failed: ${error.message}`, 'error');
-      return {
-        success: false,
-        reason: `Stage error: ${error.message}`
-      };
     }
   }
 
@@ -434,10 +393,19 @@ class ConnectionManager {
    */
   async waitForClientReady(playerSource, identifiers) {
     return new Promise((resolve) => {
-      // Set waiting stage
-      this.setPlayerStage(playerSource, this.framework.constants.PlayerStage.WAITING_CLIENT);
       const license = identifiers.license;
+
+      // Set waiting stage using license-based method
+      this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.WAITING_CLIENT);
       console.log(`[NextGen] [Connection] Waiting for client ${playerSource} (${license}) to become ready...`);
+
+      // Check if client-ready signal arrived early (before resolver was set up)
+      if (this.earlyReadySignals.has(license)) {
+        this.earlyReadySignals.delete(license);
+        console.log(`[NextGen] [Connection] Client ${license} had early ready signal - resolving immediately`);
+        resolve({ success: true });
+        return;
+      }
 
       let resolved = false;
 
@@ -454,9 +422,6 @@ class ConnectionManager {
       }, 30000); // 30 second timeout
 
       // Store the resolve function using LICENSE as key (source changes from 65536 to 1)
-      if (!this.clientReadyResolvers) {
-        this.clientReadyResolvers = new Map();
-      }
       this.clientReadyResolvers.set(license, (success) => {
         if (!resolved) {
           resolved = true;
@@ -578,10 +543,20 @@ class ConnectionManager {
 
       // Clean up after a delay (in case resources need the data)
       setTimeout(() => {
-        this.playerStages.delete(license);
-        this.playerData.delete(license);
+        this.cleanupPlayer(license);
       }, 5000);
     }
+  }
+
+  /**
+   * Clean up all tracking data for a player (centralized)
+   * @param {string} license - Player license identifier
+   */
+  cleanupPlayer(license) {
+    this.playerStages.delete(license);
+    this.playerData.delete(license);
+    this.clientReadyResolvers.delete(license);
+    this.earlyReadySignals.delete(license);
   }
 
   /**
@@ -648,6 +623,7 @@ class ConnectionManager {
     this.playerStages.clear();
     this.playerData.clear();
     this.clientReadyResolvers.clear();
+    this.earlyReadySignals.clear();
     this.log('Connection Manager destroyed', 'info');
   }
 }

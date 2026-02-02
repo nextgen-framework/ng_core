@@ -44,9 +44,6 @@ class Queue {
     this.whitelist = this.framework.getModule('whitelist');
     this.connectionManager = this.framework.getModule('connection-manager');
 
-    // Load queue type configurations from database
-    await this.loadQueueTypes();
-
     // Load player priorities and queue types from database
     await this.loadPriorities();
 
@@ -60,24 +57,13 @@ class Queue {
     this.startUpdateLoop();
 
     // Handle player drops
-    on('playerDropped', () => {
-      this.removeFromQueue(source);
-      this.connecting.delete(source);
-      this.processQueue();
+    this.framework.fivem.on('playerDropped', () => {
+      const src = source;
+      this.handlePlayerDrop(src);
     });
 
     const forceQueueMsg = this.config.forceQueue ? ' [FORCE QUEUE MODE - TESTING]' : '';
     this.log(`Queue module initialized (max: ${this.config.maxPlayers}, reserved: ${this.config.reservedSlots})${forceQueueMsg}`, 'info');
-  }
-
-  /**
-   * Load queue type configurations from database
-   * Queue types are now in-memory only, registered by external resources
-   */
-  async loadQueueTypes() {
-    // Queue types are registered dynamically by external resources
-    // No database persistence needed
-    this.typeConfigs.clear();
   }
 
   /**
@@ -264,29 +250,42 @@ class Queue {
     // In force queue mode, ignore slot availability (always process queue)
     if (!this.config.forceQueue && availableSlots <= 0) return;
 
-    // Let next player(s) connect
+    // Collect entries to process (avoid splice during iteration)
+    const toProcess = [];
+    const toTimeout = [];
     const slotsToFill = this.config.forceQueue ? this.queue.length : Math.min(availableSlots, this.queue.length);
+    let processed = 0;
 
-    for (let i = 0; i < slotsToFill; i++) {
+    for (let i = 0; i < this.queue.length && processed < slotsToFill; i++) {
       const entry = this.queue[i];
 
       // Check timeout
       if (Date.now() - entry.joinedAt > this.config.connectTimeout) {
-        this.removeFromQueue(entry.source);
-        entry.deferrals.done('Connection timeout');
-        this.log(`Player ${entry.identifiers.license} timed out in queue`, 'warn');
+        toTimeout.push(entry);
         continue;
       }
 
       // In force queue mode, require minimum 10 seconds in queue for testing
-      const minQueueTime = this.config.forceQueue ? 10000 : 0; // 10 seconds in force mode
+      const minQueueTime = this.config.forceQueue ? 10000 : 0;
       const timeInQueue = Date.now() - entry.joinedAt;
 
       if (timeInQueue < minQueueTime) {
-        continue; // Skip this player, they haven't been in queue long enough for testing
+        continue;
       }
 
-      // Allow connection through stages
+      toProcess.push(entry);
+      processed++;
+    }
+
+    // Handle timeouts
+    for (const entry of toTimeout) {
+      this.removeFromQueue(entry.source);
+      entry.deferrals.done('Connection timeout');
+      this.log(`Player ${entry.identifiers.license} timed out in queue`, 'warn');
+    }
+
+    // Process allowed entries
+    for (const entry of toProcess) {
       this.removeFromQueue(entry.source);
       this.connecting.add(entry.source);
 
@@ -297,11 +296,13 @@ class Queue {
 
       this.log(`Player ${entry.identifiers.license} allowed to connect from queue`, 'info');
 
+      // Notify plugins (ng_queue) to cleanup animation state
+      this.framework.fivem.emit('ng:queue:playerExitQueue', entry.source);
+
       // Start connection process through connection-manager
       if (this.connectionManager) {
         await this.connectionManager.startConnectionProcess(entry.source, entry.deferrals, entry.identifiers);
       } else {
-        // Fallback if connection-manager not available
         entry.deferrals.done();
       }
     }
@@ -310,10 +311,13 @@ class Queue {
   /**
    * Update queue positions for all players
    */
-  updateQueuePositions() {
+  /**
+   * Re-sort queue and update all positions
+   */
+  resortAndUpdate() {
+    this.queue.sort((a, b) => a.priority - b.priority);
     for (let i = 0; i < this.queue.length; i++) {
-      const entry = this.queue[i];
-      this.updateQueuePosition(entry, i + 1);
+      this.updateQueuePosition(this.queue[i], i + 1);
     }
   }
 
@@ -451,9 +455,7 @@ class Queue {
 
       this.log(`Set queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`, 'info');
 
-      // Reorder queue
-      this.queue.sort((a, b) => a.priority - b.priority);
-      this.updateQueuePositions();
+      this.resortAndUpdate();
 
       return { success: true };
     } catch (error) {
@@ -488,9 +490,7 @@ class Queue {
 
     this.log(`Set dynamic queue ${queueType ? `type '${queueType}'` : `priority ${priority}`} for ${identifier}`, 'info');
 
-    // Reorder queue if player is in it
-    this.queue.sort((a, b) => a.priority - b.priority);
-    this.updateQueuePositions();
+    this.resortAndUpdate();
 
     return { success: true };
   }
@@ -520,9 +520,7 @@ class Queue {
     if (hadPriority || hadType) {
       this.log(`Removed dynamic queue assignment for ${identifier}`, 'info');
 
-      // Reorder queue
-      this.queue.sort((a, b) => a.priority - b.priority);
-      this.updateQueuePositions();
+      this.resortAndUpdate();
 
       return { success: true };
     }
@@ -577,7 +575,7 @@ class Queue {
    */
   startUpdateLoop() {
     this.updateTimer = setInterval(() => {
-      this.updateQueuePositions();
+      this.resortAndUpdate();
       this.processQueue();
     }, this.config.updateInterval);
   }
@@ -605,6 +603,7 @@ class Queue {
    */
   disable() {
     this.config.enabled = false;
+    this.stopUpdateLoop();
 
     // Clear queue and let everyone in
     for (const entry of this.queue) {
@@ -637,6 +636,38 @@ class Queue {
     }
 
     return identifiers;
+  }
+
+  /**
+   * Handle player drop - cleanup queue, connecting set, and dynamic assignments
+   */
+  handlePlayerDrop(playerSource) {
+    // Finalize deferral if player was in queue (prevents deferral leak)
+    const queueEntry = this.queue.find(e => e.source === playerSource);
+    if (queueEntry) {
+      try {
+        queueEntry.deferrals.done('Player disconnected');
+      } catch (e) {
+        // Deferral may already be finalized
+      }
+    }
+
+    this.removeFromQueue(playerSource);
+    this.connecting.delete(playerSource);
+
+    // Cleanup dynamic assignments for this player's identifiers
+    try {
+      const identifiers = this.getPlayerIdentifiers(playerSource);
+      for (const [type, value] of Object.entries(identifiers)) {
+        const identifier = `${type}:${value}`;
+        this.dynamicPriorities.delete(identifier);
+        this.dynamicQueueTypes.delete(identifier);
+      }
+    } catch (e) {
+      // Player may already be fully disconnected, identifiers unavailable
+    }
+
+    this.processQueue();
   }
 
   /**

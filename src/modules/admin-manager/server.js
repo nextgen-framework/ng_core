@@ -7,7 +7,6 @@ class AdminManager {
   constructor(framework) {
     this.framework = framework;
     this.db = null;
-    this.logger = null;
 
     // Admin permissions
     this.admins = new Map(); // identifier => permission level
@@ -19,25 +18,30 @@ class AdminManager {
   }
 
   async init() {
-    this.logger = this.framework.getModule('logger');
     this.db = this.framework.getModule('database');
-    await this.loadAdmins();
+
+    if (this.db && this.db.isConnected()) {
+      await this.loadAdmins();
+    } else {
+      this.framework.log.warn('Database not available, starting without admin persistence');
+    }
 
     // Register admin commands via chat-commands
     this.registerCommands();
 
-    this.log('Admin manager initialized', 'info');
+    this.framework.log.info('Admin manager initialized');
   }
 
   async loadAdmins() {
     try {
+      this.admins.clear();
       const admins = await this.db.query('SELECT identifier, permission_level FROM admins WHERE active = 1');
       for (const admin of admins) {
         this.admins.set(admin.identifier, admin.permission_level);
       }
-      this.log(`Loaded ${admins.length} admins`, 'debug');
+      this.framework.log.debug(`Loaded ${admins.length} admins`);
     } catch (error) {
-      this.log(`Failed to load admins: ${error.message}`, 'error');
+      this.framework.log.error(`Failed to load admins: ${error.message}`);
     }
   }
 
@@ -48,7 +52,7 @@ class AdminManager {
         [identifier, level, addedBy]
       );
       this.admins.set(identifier, level);
-      this.log(`Added admin: ${identifier} (level ${level})`, 'info');
+      this.framework.log.info(`Added admin: ${identifier} (level ${level})`);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -66,7 +70,7 @@ class AdminManager {
   }
 
   isAdmin(source) {
-    const player = this.framework.getModule('player-manager')?.getPlayer(source);
+    const player = this.framework.getModule('player-manager')?.get(source);
     if (!player) return false;
 
     const identifier = player.getIdentifier('license');
@@ -74,7 +78,7 @@ class AdminManager {
   }
 
   getPermissionLevel(source) {
-    const player = this.framework.getModule('player-manager')?.getPlayer(source);
+    const player = this.framework.getModule('player-manager')?.get(source);
     if (!player) return 0;
 
     const identifier = player.getIdentifier('license');
@@ -98,6 +102,8 @@ class AdminManager {
         const y = parseFloat(args[1]);
         const z = args.length >= 3 ? parseFloat(args[2]) : 0;
 
+        if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+
         const ped = GetPlayerPed(source);
         SetEntityCoords(ped, x, y, z, false, false, false, false);
       }
@@ -111,6 +117,12 @@ class AdminManager {
       const amount = parseInt(args[1]);
       const type = args[2] || 'cash';
 
+      if (isNaN(targetSource) || isNaN(amount) || amount <= 0) return;
+
+      // Verify target player exists
+      const pm = this.framework.getModule('player-manager');
+      if (!pm || !pm.get(targetSource)) return;
+
       const moneyManager = this.framework.getModule('money-manager');
       if (moneyManager) {
         moneyManager.addMoney(targetSource, type, amount, 'admin_give');
@@ -122,12 +134,6 @@ class AdminManager {
       if (!this.isAdmin(source)) return;
       this.framework.fivem.emitNet('ng_core:admin-noclip', source);
     });
-  }
-
-  log(message, level = 'info', metadata = {}) {
-    if (this.logger) {
-      this.logger.log(message, level, metadata);
-    }
   }
 
   async destroy() {

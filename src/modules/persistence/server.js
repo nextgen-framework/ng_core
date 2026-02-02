@@ -1,297 +1,490 @@
 /**
  * NextGen Framework - Persistence Module
- * Centralized auto-save and persistence management for all modules
+ * World entity lifecycle manager (objects, vehicles, peds)
  *
- * This module provides:
- * - Auto-save scheduling for modules
- * - Graceful shutdown handling
- * - Save on player disconnect
- * - Manual save triggers
- * - Save queue management
+ * Responsibilities:
+ * - Track world entities registered by modules/plugins
+ * - Periodic position save for moving entities (dirty flag)
+ * - On-demand save for static entities and metadata changes
+ * - Respawn all persisted entities on server start
+ * - Respawn entities despawned by OneSync
  */
 
+const VALID_TYPES = ['vehicle', 'ped', 'object'];
+
 class PersistenceManager {
-  constructor(framework) {
-    this.framework = framework;
-    this.db = null;
+    constructor(framework) {
+        this.framework = framework;
+        this.db = null;
 
-    // Registered save handlers from modules
-    this.saveHandlers = new Map(); // moduleName => { handler, interval, lastSave }
+        // Tracked entities: persistenceId => entity data
+        this.entities = new Map();
 
-    // Save intervals
-    this.intervals = new Map(); // moduleName => intervalId
+        // netId => persistenceId reverse lookup
+        this.netIdIndex = new Map();
 
-    // Configuration
-    this.config = {
-      defaultInterval: 300000, // 5 minutes default
-      saveOnDisconnect: true,
-      saveOnShutdown: true,
-      batchSaveDelay: 1000, // Delay between batch saves to avoid DB overload
-      maxRetries: 3
-    };
+        // Dirty flags for position changes
+        this.dirtyPosition = new Set(); // Set of persistenceId
 
-    // Save queue for player-specific data
-    this.saveQueue = new Set(); // Set of sources pending save
-    this.isSaving = false;
-  }
+        // Dirty flags for metadata changes
+        this.dirtyMetadata = new Set(); // Set of persistenceId
 
-  async init() {
-    this.db = this.framework.getModule('database');
+        // Save interval handle
+        this.saveIntervalId = null;
 
-    // Register event handlers
-    this.registerEvents();
+        // OneSync check interval handle
+        this.checkIntervalId = null;
 
-    this.framework.log.info('Persistence manager initialized');
-  }
-
-  registerEvents() {
-    // Save on player disconnect
-    if (this.config.saveOnDisconnect) {
-      on('playerDropped', async (reason) => {
-        const src = global.source;
-        await this.savePlayerData(src, 'disconnect');
-      });
+        // Configuration
+        this.config = {
+            saveInterval: 30000,       // 30s default position save
+            checkInterval: 10000,      // 10s check for despawned entities
+            maxRetries: 3
+        };
     }
 
-    // Save on resource stop (graceful shutdown)
-    if (this.config.saveOnShutdown) {
-      on('onResourceStop', async (resourceName) => {
-        if (resourceName === GetCurrentResourceName()) {
-          await this.saveAll('shutdown');
+    async init() {
+        this.db = this.framework.getModule('database');
+
+        if (this.db?.isConnected()) {
+            await this.loadFromDB();
         }
-      });
-    }
-  }
 
-  /**
-   * Register a save handler for a module
-   * @param {string} moduleName - Name of the module
-   * @param {Function} handler - Save handler function (async)
-   * @param {Object} options - Options { interval, saveOnDisconnect }
-   */
-  register(moduleName, handler, options = {}) {
-    const interval = options.interval || this.config.defaultInterval;
-    const saveOnDisconnect = options.saveOnDisconnect !== false;
+        this.startIntervals();
+        this.registerEvents();
 
-    this.saveHandlers.set(moduleName, {
-      handler,
-      interval,
-      saveOnDisconnect,
-      lastSave: Date.now()
-    });
-
-    // Start auto-save interval if interval > 0
-    if (interval > 0) {
-      this.startAutoSave(moduleName);
+        this.framework.log.info(`Persistence manager initialized (${this.entities.size} entities loaded)`);
     }
 
-    this.framework.log.debug(`Registered save handler for ${moduleName} (interval: ${interval}ms)`);
-  }
+    /**
+     * Load all persisted entities from DB and spawn them
+     */
+    async loadFromDB() {
+        const rows = await this.db.query('SELECT * FROM persistent_entities');
+        if (!rows || rows.length === 0) return;
 
-  /**
-   * Unregister a save handler
-   * @param {string} moduleName
-   */
-  unregister(moduleName) {
-    this.stopAutoSave(moduleName);
-    this.saveHandlers.delete(moduleName);
-    this.framework.log.debug(`Unregistered save handler for ${moduleName}`);
-  }
+        for (const row of rows) {
+            const netId = await this.spawnEntity(row.type, row.model, row.x, row.y, row.z, row.heading);
+            if (netId === null) continue;
 
-  /**
-   * Start auto-save interval for a module
-   * @param {string} moduleName
-   */
-  startAutoSave(moduleName) {
-    const saveData = this.saveHandlers.get(moduleName);
-    if (!saveData || saveData.interval <= 0) return;
+            const entity = {
+                id: row.id,
+                type: row.type,
+                model: row.model,
+                coords: { x: row.x, y: row.y, z: row.z },
+                heading: row.heading,
+                metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : (row.metadata || {}),
+                netId,
+                static: false,
+                createdBy: row.created_by
+            };
 
-    // Clear existing interval if any
-    this.stopAutoSave(moduleName);
+            this.entities.set(row.id, entity);
+            this.netIdIndex.set(netId, row.id);
 
-    // Create new interval
-    const intervalId = setInterval(async () => {
-      try {
-        await this.saveModule(moduleName, 'auto-save');
-      } catch (error) {
-        this.framework.log.error(`Auto-save failed for ${moduleName}: ${error.message}`);
-      }
-    }, saveData.interval);
-
-    this.intervals.set(moduleName, intervalId);
-    this.framework.log.debug(`Started auto-save for ${moduleName}`);
-  }
-
-  /**
-   * Stop auto-save interval for a module
-   * @param {string} moduleName
-   */
-  stopAutoSave(moduleName) {
-    const intervalId = this.intervals.get(moduleName);
-    if (intervalId) {
-      clearInterval(intervalId);
-      this.intervals.delete(moduleName);
-      this.framework.log.debug(`Stopped auto-save for ${moduleName}`);
-    }
-  }
-
-  /**
-   * Save a specific module's data
-   * @param {string} moduleName
-   * @param {string} reason - Reason for save (auto-save, manual, disconnect, shutdown)
-   */
-  async saveModule(moduleName, reason = 'manual') {
-    const saveData = this.saveHandlers.get(moduleName);
-    if (!saveData) {
-      this.framework.log.warn(`No save handler registered for ${moduleName}`);
-      return { success: false, error: 'No handler registered' };
-    }
-
-    const startTime = Date.now();
-    let retries = 0;
-    let lastError = null;
-
-    // Retry logic
-    while (retries < this.config.maxRetries) {
-      try {
-        await saveData.handler();
-
-        saveData.lastSave = Date.now();
-        const duration = Date.now() - startTime;
-
-        this.framework.log.debug(`Saved ${moduleName} data (${reason}) in ${duration}ms`);
-        return { success: true, duration };
-      } catch (error) {
-        lastError = error;
-        retries++;
-
-        if (retries < this.config.maxRetries) {
-          this.framework.log.warn(`Save failed for ${moduleName} (attempt ${retries}/${this.config.maxRetries}): ${error.message}`);
-          await this.sleep(1000 * retries); // Exponential backoff
+            // Notify modules to apply their metadata
+            this.framework.emit('persistence:spawned', {
+                id: row.id,
+                type: row.type,
+                model: row.model,
+                netId,
+                metadata: entity.metadata
+            });
         }
-      }
     }
 
-    // All retries failed
-    this.framework.log.error(`Save failed for ${moduleName} after ${this.config.maxRetries} attempts: ${lastError.message}`);
-    return { success: false, error: lastError.message };
-  }
+    /**
+     * Spawn a GTA entity by type
+     * @param {string} type - vehicle, ped, object
+     * @param {string} model - Model name or hash
+     * @param {number} x
+     * @param {number} y
+     * @param {number} z
+     * @param {number} heading
+     * @returns {number|null} netId or null on failure
+     */
+    async spawnEntity(type, model, x, y, z, heading) {
+        try {
+            const hash = typeof model === 'string' ? GetHashKey(model) : model;
 
-  /**
-   * Save player-specific data from all modules
-   * @param {number} source - Player source
-   * @param {string} reason
-   */
-  async savePlayerData(source, reason = 'manual') {
-    const startTime = Date.now();
-    const results = [];
+            let entityId;
+            switch (type) {
+                case 'vehicle':
+                    entityId = CreateVehicle(hash, x, y, z, heading, true, true);
+                    break;
+                case 'ped':
+                    entityId = CreatePed(4, hash, x, y, z, heading, true, true);
+                    break;
+                case 'object':
+                    entityId = CreateObject(hash, x, y, z, true, true, false);
+                    break;
+                default:
+                    this.framework.log.error(`Unknown entity type: ${type}`);
+                    return null;
+            }
 
-    for (const [moduleName, saveData] of this.saveHandlers.entries()) {
-      if (!saveData.saveOnDisconnect && reason === 'disconnect') {
-        continue; // Skip modules that don't save on disconnect
-      }
+            if (!entityId || entityId === 0) {
+                this.framework.log.error(`Failed to spawn ${type} (model: ${model})`);
+                return null;
+            }
 
-      try {
-        // Call handler with source parameter
-        await saveData.handler(source);
-        results.push({ module: moduleName, success: true });
-      } catch (error) {
-        this.framework.log.error(`Failed to save player data for ${moduleName}: ${error.message}`);
-        results.push({ module: moduleName, success: false, error: error.message });
-      }
+            return NetworkGetNetworkIdFromEntity(entityId);
+        } catch (error) {
+            this.framework.log.error(`Spawn error for ${type}: ${error.message}`);
+            return null;
+        }
     }
 
-    const duration = Date.now() - startTime;
-    const successCount = results.filter(r => r.success).length;
-
-    this.framework.log.debug(`Saved player ${source} data from ${successCount}/${results.length} modules (${reason}) in ${duration}ms`);
-    return { success: true, results, duration };
-  }
-
-  /**
-   * Save all data from all registered modules
-   * @param {string} reason
-   */
-  async saveAll(reason = 'manual') {
-    if (this.isSaving) {
-      this.framework.log.warn('Save already in progress, skipping');
-      return { success: false, error: 'Save in progress' };
+    registerEvents() {
+        this.framework.fivem.on('onResourceStop', async (resourceName) => {
+            if (resourceName === GetCurrentResourceName()) {
+                await this.saveAll();
+            }
+        });
     }
 
-    this.isSaving = true;
-    const startTime = Date.now();
-    const results = [];
+    startIntervals() {
+        // Periodic position save for moving entities
+        this.saveIntervalId = setInterval(async () => {
+            await this.saveDirtyPositions();
+        }, this.config.saveInterval);
 
-    this.framework.log.info(`Starting full save (${reason})...`);
-
-    for (const moduleName of this.saveHandlers.keys()) {
-      const result = await this.saveModule(moduleName, reason);
-      results.push({ module: moduleName, ...result });
-
-      // Add delay between saves to avoid DB overload
-      if (this.config.batchSaveDelay > 0) {
-        await this.sleep(this.config.batchSaveDelay);
-      }
+        // Check for despawned entities (OneSync)
+        this.checkIntervalId = setInterval(() => {
+            this.checkDespawned();
+        }, this.config.checkInterval);
     }
 
-    this.isSaving = false;
-    const duration = Date.now() - startTime;
-    const successCount = results.filter(r => r.success).length;
+    /**
+     * Register a world entity for persistence
+     * @param {number} netId - Network entity ID
+     * @param {Object} data - { type, model, coords, heading, metadata }
+     * @param {Object} options - { static, saveInterval }
+     * @returns {number|null} persistenceId
+     */
+    async register(netId, data, options = {}) {
+        if (!VALID_TYPES.includes(data.type)) {
+            this.framework.log.error(`Invalid entity type: ${data.type}`);
+            return null;
+        }
 
-    this.framework.log.info(`Full save completed: ${successCount}/${results.length} modules in ${duration}ms`);
-    return { success: true, results, duration };
-  }
+        const isStatic = options.static || false;
 
-  /**
-   * Get save status for all modules
-   */
-  getStatus() {
-    const status = [];
+        // Insert into DB
+        let id = null;
+        if (this.db?.isConnected()) {
+            const result = await this.db.execute(
+                'INSERT INTO persistent_entities (type, model, x, y, z, heading, metadata, net_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    data.type,
+                    data.model,
+                    data.coords.x,
+                    data.coords.y,
+                    data.coords.z,
+                    data.heading || 0,
+                    JSON.stringify(data.metadata || {}),
+                    netId,
+                    data.createdBy || null
+                ]
+            );
+            id = result.insertId;
+        }
 
-    for (const [moduleName, saveData] of this.saveHandlers.entries()) {
-      const timeSinceLastSave = Date.now() - saveData.lastSave;
-      const hasInterval = this.intervals.has(moduleName);
+        if (!id) return null;
 
-      status.push({
-        module: moduleName,
-        interval: saveData.interval,
-        lastSave: saveData.lastSave,
-        timeSinceLastSave,
-        autoSaveEnabled: hasInterval,
-        saveOnDisconnect: saveData.saveOnDisconnect
-      });
+        const entity = {
+            id,
+            type: data.type,
+            model: data.model,
+            coords: { ...data.coords },
+            heading: data.heading || 0,
+            metadata: data.metadata || {},
+            netId,
+            static: isStatic,
+            createdBy: data.createdBy || null
+        };
+
+        this.entities.set(id, entity);
+        this.netIdIndex.set(netId, id);
+
+        this.framework.log.debug(`Registered ${data.type} (id: ${id}, netId: ${netId})`);
+        return id;
     }
 
-    return status;
-  }
+    /**
+     * Save entity immediately (position + metadata)
+     * @param {number} id - Persistence ID
+     */
+    async save(id) {
+        const entity = this.entities.get(id);
+        if (!entity) return false;
 
-  /**
-   * Manual save trigger (can be called via command)
-   */
-  async triggerManualSave() {
-    return await this.saveAll('manual');
-  }
+        this.updateEntityPosition(entity);
 
-  /**
-   * Sleep helper
-   */
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+        if (!this.db?.isConnected()) return false;
 
-  async destroy() {
-    // Save all data before destroying
-    await this.saveAll('destroy');
+        await this.db.execute(
+            'UPDATE persistent_entities SET x = ?, y = ?, z = ?, heading = ?, metadata = ?, net_id = ?, updated_at = NOW() WHERE id = ?',
+            [entity.coords.x, entity.coords.y, entity.coords.z, entity.heading, JSON.stringify(entity.metadata), entity.netId, entity.id]
+        );
 
-    // Stop all intervals
-    for (const moduleName of this.intervals.keys()) {
-      this.stopAutoSave(moduleName);
+        this.dirtyPosition.delete(id);
+        this.dirtyMetadata.delete(id);
+        return true;
     }
 
-    // Clear handlers
-    this.saveHandlers.clear();
-    this.intervals.clear();
-  }
+    /**
+     * Remove a persisted entity
+     * @param {number} id - Persistence ID
+     */
+    async remove(id) {
+        const entity = this.entities.get(id);
+        if (!entity) return false;
+
+        if (this.db?.isConnected()) {
+            await this.db.execute('DELETE FROM persistent_entities WHERE id = ?', [id]);
+        }
+
+        this.netIdIndex.delete(entity.netId);
+        this.entities.delete(id);
+        this.dirtyPosition.delete(id);
+        this.dirtyMetadata.delete(id);
+
+        this.framework.log.debug(`Removed ${entity.type} (id: ${id})`);
+        return true;
+    }
+
+    /**
+     * Update entity metadata (marks dirty for next save)
+     * @param {number} id - Persistence ID
+     * @param {Object} metadata - New metadata (merged)
+     */
+    updateMetadata(id, metadata) {
+        const entity = this.entities.get(id);
+        if (!entity) return false;
+
+        entity.metadata = { ...entity.metadata, ...metadata };
+        this.dirtyMetadata.add(id);
+        return true;
+    }
+
+    /**
+     * Get all entities of a type
+     * @param {string} type
+     * @returns {Array}
+     */
+    getByType(type) {
+        const results = [];
+        for (const entity of this.entities.values()) {
+            if (entity.type === type) results.push(entity);
+        }
+        return results;
+    }
+
+    /**
+     * Get entity by persistence ID
+     * @param {number} id
+     * @returns {Object|null}
+     */
+    get(id) {
+        return this.entities.get(id) || null;
+    }
+
+    /**
+     * Get entity by netId
+     * @param {number} netId
+     * @returns {Object|null}
+     */
+    getByNetId(netId) {
+        const id = this.netIdIndex.get(netId);
+        if (id === undefined) return null;
+        return this.entities.get(id) || null;
+    }
+
+    /**
+     * Read current position from GTA entity and update in-memory
+     * @param {Object} entity
+     */
+    updateEntityPosition(entity) {
+        if (!entity.netId) return;
+
+        const entityId = NetworkGetEntityFromNetworkId(entity.netId);
+        if (!entityId || entityId === 0) return;
+
+        const coords = GetEntityCoords(entityId);
+        const heading = GetEntityHeading(entityId);
+
+        if (coords[0] !== entity.coords.x || coords[1] !== entity.coords.y || coords[2] !== entity.coords.z) {
+            entity.coords = { x: coords[0], y: coords[1], z: coords[2] };
+            entity.heading = heading;
+            this.dirtyPosition.add(entity.id);
+        }
+    }
+
+    /**
+     * Save all dirty positions to DB (periodic)
+     */
+    async saveDirtyPositions() {
+        if (!this.db?.isConnected()) return;
+
+        // Update positions from GTA for non-static entities
+        for (const entity of this.entities.values()) {
+            if (!entity.static) {
+                this.updateEntityPosition(entity);
+            }
+        }
+
+        // Batch save dirty positions
+        const dirtyIds = [...this.dirtyPosition];
+        if (dirtyIds.length === 0 && this.dirtyMetadata.size === 0) return;
+
+        for (const id of dirtyIds) {
+            const entity = this.entities.get(id);
+            if (!entity) continue;
+
+            const includeMetadata = this.dirtyMetadata.has(id);
+
+            if (includeMetadata) {
+                await this.db.execute(
+                    'UPDATE persistent_entities SET x = ?, y = ?, z = ?, heading = ?, metadata = ?, updated_at = NOW() WHERE id = ?',
+                    [entity.coords.x, entity.coords.y, entity.coords.z, entity.heading, JSON.stringify(entity.metadata), id]
+                );
+                this.dirtyMetadata.delete(id);
+            } else {
+                await this.db.execute(
+                    'UPDATE persistent_entities SET x = ?, y = ?, z = ?, heading = ?, updated_at = NOW() WHERE id = ?',
+                    [entity.coords.x, entity.coords.y, entity.coords.z, entity.heading, id]
+                );
+            }
+        }
+
+        this.dirtyPosition.clear();
+
+        // Save remaining dirty metadata (entities not in dirtyPosition)
+        for (const id of [...this.dirtyMetadata]) {
+            const entity = this.entities.get(id);
+            if (!entity) continue;
+
+            await this.db.execute(
+                'UPDATE persistent_entities SET metadata = ?, updated_at = NOW() WHERE id = ?',
+                [JSON.stringify(entity.metadata), id]
+            );
+        }
+
+        this.dirtyMetadata.clear();
+
+        if (dirtyIds.length > 0) {
+            this.framework.log.debug(`Saved ${dirtyIds.length} dirty positions`);
+        }
+    }
+
+    /**
+     * Check for despawned entities and respawn them
+     */
+    checkDespawned() {
+        for (const entity of this.entities.values()) {
+            if (!entity.netId) continue;
+
+            const entityId = NetworkGetEntityFromNetworkId(entity.netId);
+            if (entityId && entityId !== 0 && DoesEntityExist(entityId)) continue;
+
+            // Entity despawned by OneSync - respawn
+            this.respawnEntity(entity);
+        }
+    }
+
+    /**
+     * Respawn a despawned entity
+     * @param {Object} entity
+     */
+    async respawnEntity(entity) {
+        this.framework.log.debug(`Respawning ${entity.type} (id: ${entity.id})`);
+
+        // Remove old netId mapping
+        this.netIdIndex.delete(entity.netId);
+
+        const newNetId = await this.spawnEntity(entity.type, entity.model, entity.coords.x, entity.coords.y, entity.coords.z, entity.heading);
+        if (newNetId === null) {
+            entity.netId = null;
+            return;
+        }
+
+        entity.netId = newNetId;
+        this.netIdIndex.set(newNetId, entity.id);
+
+        // Notify modules to re-apply metadata
+        this.framework.emit('persistence:spawned', {
+            id: entity.id,
+            type: entity.type,
+            model: entity.model,
+            netId: newNetId,
+            metadata: entity.metadata
+        });
+    }
+
+    /**
+     * Save all entities to DB
+     */
+    async saveAll() {
+        if (!this.db?.isConnected()) return;
+
+        // Update all non-static positions
+        for (const entity of this.entities.values()) {
+            if (!entity.static) {
+                this.updateEntityPosition(entity);
+            }
+        }
+
+        // Batch save all
+        const promises = [];
+        for (const entity of this.entities.values()) {
+            promises.push(
+                this.db.execute(
+                    'UPDATE persistent_entities SET x = ?, y = ?, z = ?, heading = ?, metadata = ?, net_id = ?, updated_at = NOW() WHERE id = ?',
+                    [entity.coords.x, entity.coords.y, entity.coords.z, entity.heading, JSON.stringify(entity.metadata), entity.netId, entity.id]
+                ).catch(err => this.framework.log.error(`Save failed for entity ${entity.id}: ${err.message}`))
+            );
+        }
+
+        await Promise.all(promises);
+
+        this.dirtyPosition.clear();
+        this.dirtyMetadata.clear();
+
+        this.framework.log.info(`Saved ${this.entities.size} entities`);
+    }
+
+    /**
+     * Get status/stats
+     */
+    getStatus() {
+        const byType = {};
+        for (const entity of this.entities.values()) {
+            byType[entity.type] = (byType[entity.type] || 0) + 1;
+        }
+
+        return {
+            total: this.entities.size,
+            byType,
+            dirtyPositions: this.dirtyPosition.size,
+            dirtyMetadata: this.dirtyMetadata.size
+        };
+    }
+
+    async destroy() {
+        // Stop intervals first
+        if (this.saveIntervalId) clearInterval(this.saveIntervalId);
+        if (this.checkIntervalId) clearInterval(this.checkIntervalId);
+
+        // Save everything
+        await this.saveAll();
+
+        // Clear
+        this.entities.clear();
+        this.netIdIndex.clear();
+        this.dirtyPosition.clear();
+        this.dirtyMetadata.clear();
+    }
 }
 
 module.exports = PersistenceManager;

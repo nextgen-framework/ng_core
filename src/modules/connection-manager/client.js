@@ -16,7 +16,7 @@ setTimeout(() => {
 }, 60000); // 60 seconds
 
 // Listen for loading progress updates from server (network event)
-global.Framework.onNet('ng:loading:updateProgress', (progress, stage, message) => {
+global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, message) => {
   console.log(`[Loading Screen] Received stage update: ${stage} - ${message}`);
 
   // Send to NUI

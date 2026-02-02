@@ -25,7 +25,8 @@ class RPCModule {
   registerEventHandlers() {
     // Handle RPC requests from clients
     this.framework.onNet(global.NextGenConstants.Events.RPC_REQUEST, async (callId, rpcName, ...args) => {
-      // Note: 'source' is a magic global variable in FiveM event handlers
+      // Capture source immediately - magic global can change during async
+      const src = source;
 
       try {
         const handler = this.handlers.get(rpcName);
@@ -33,40 +34,65 @@ class RPCModule {
           throw new Error(`RPC handler "${rpcName}" not found`);
         }
 
-        // Execute handler with source as first argument
-        const result = await handler(source, ...args);
+        const result = await handler(src, ...args);
 
-        // Send response back to client
-        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, src, callId, {
           success: true,
           data: result
         });
       } catch (error) {
-        // Send error response
-        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, source, callId, {
-          success: false,
-          error: error.message
-        });
+        // Log full error server-side, send generic message to client
+        this.framework.log.error(`RPC error "${rpcName}" (source: ${src}): ${error.message}`);
 
-        this.framework.log.error(`RPC error "${rpcName}": ${error.message}`);
+        this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_RESPONSE, src, callId, {
+          success: false,
+          error: 'Internal server error'
+        });
       }
+    });
+
+    // Cleanup pending calls when player disconnects
+    this.framework.fivem.on('playerDropped', () => {
+      const src = source;
+      this.cleanupPlayer(src);
     });
 
     // Handle RPC responses (for server -> client calls)
     this.framework.onNet(global.NextGenConstants.Events.RPC_RESPONSE, (callId, response) => {
+      const src = source;
       const pending = this.pendingCalls.get(callId);
-      if (pending) {
+      if (!pending) return;
+
+      // Anti-spoofing: verify response comes from the expected client
+      if (pending.targetSource !== src) {
+        this.framework.log.warn(`RPC response spoofing attempt: expected source ${pending.targetSource}, got ${src}`);
+        return;
+      }
+
+      clearTimeout(pending.timeout);
+
+      if (response.success) {
+        pending.resolve(response.data);
+      } else {
+        pending.reject(new Error(response.error));
+      }
+
+      this.pendingCalls.delete(callId);
+    });
+  }
+
+  /**
+   * Cleanup pending calls for a disconnected player
+   * @param {number} playerSource
+   */
+  cleanupPlayer(playerSource) {
+    for (const [callId, pending] of this.pendingCalls) {
+      if (pending.targetSource === playerSource) {
         clearTimeout(pending.timeout);
-
-        if (response.success) {
-          pending.resolve(response.data);
-        } else {
-          pending.reject(new Error(response.error));
-        }
-
+        pending.reject(new Error(`Player ${playerSource} disconnected`));
         this.pendingCalls.delete(callId);
       }
-    });
+    }
   }
 
   /**
@@ -108,8 +134,8 @@ class RPCModule {
         reject(new Error(`RPC call "${rpcName}" to client ${source} timed out`));
       }, this.callTimeout);
 
-      // Store pending call
-      this.pendingCalls.set(callId, { resolve, reject, timeout });
+      // Store pending call with target source for anti-spoofing
+      this.pendingCalls.set(callId, { resolve, reject, timeout, targetSource: source });
 
       // Send RPC request to client
       this.framework.fivem.emitNet(global.NextGenConstants.Events.RPC_REQUEST, source, callId, rpcName, ...args);
@@ -179,6 +205,20 @@ class RPCModule {
    */
   getRegisteredRPCs() {
     return Array.from(this.handlers.keys());
+  }
+
+  /**
+   * Cleanup method
+   */
+  async destroy() {
+    // Reject all pending calls
+    for (const [callId, pending] of this.pendingCalls) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error('RPC module destroyed'));
+    }
+
+    this.pendingCalls.clear();
+    this.handlers.clear();
   }
 }
 
