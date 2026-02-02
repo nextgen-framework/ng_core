@@ -151,7 +151,9 @@ class SpawnManagerClient {
   }
 }
 
-module.exports = SpawnManagerClient;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SpawnManagerClient;
+}
 
 // Self-register
 global.Framework.register('spawn-manager', new SpawnManagerClient(global.Framework), 15);

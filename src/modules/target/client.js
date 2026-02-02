@@ -437,7 +437,9 @@ class TargetManager {
   }
 }
 
-module.exports = TargetManager;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TargetManager;
+}
 
 // Self-register
 global.Framework.register('target', new TargetManager(global.Framework), 13);

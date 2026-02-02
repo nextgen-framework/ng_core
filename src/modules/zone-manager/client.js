@@ -462,7 +462,9 @@ class ZoneManagerClientModule {
   }
 }
 
-module.exports = ZoneManagerClientModule;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ZoneManagerClientModule;
+}
 
 // Self-register
 global.Framework.register('zone-manager', new ZoneManagerClientModule(global.Framework), 12);

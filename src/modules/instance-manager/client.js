@@ -157,7 +157,9 @@ class InstanceManagerClient {
   }
 }
 
-module.exports = InstanceManagerClient;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = InstanceManagerClient;
+}
 
 // Self-register
 global.Framework.register('instance-manager', new InstanceManagerClient(global.Framework), 12);

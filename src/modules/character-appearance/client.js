@@ -191,7 +191,9 @@ class CharacterAppearanceClient {
   }
 }
 
-module.exports = CharacterAppearanceClient;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CharacterAppearanceClient;
+}
 
 // Self-register
 global.Framework.register('character-appearance', new CharacterAppearanceClient(global.Framework), 15);

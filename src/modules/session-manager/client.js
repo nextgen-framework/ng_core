@@ -231,7 +231,9 @@ class SessionManagerClient {
   }
 }
 
-module.exports = SessionManagerClient;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SessionManagerClient;
+}
 
 // Self-register
 global.Framework.register('session-manager', new SessionManagerClient(global.Framework), 12);

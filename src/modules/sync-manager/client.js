@@ -121,7 +121,9 @@ class SyncManagerClient {
     }
 }
 
-module.exports = SyncManagerClient;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SyncManagerClient;
+}
 
 // Self-register
 global.Framework.register('sync-manager', new SyncManagerClient(global.Framework), 11);
