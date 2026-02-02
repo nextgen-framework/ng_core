@@ -34,6 +34,13 @@ class SessionManager {
   async init() {
     this.instanceManager = this.framework.getModule('instance-manager');
 
+    // Inactive session cleanup timer
+    if (this.config.autoCleanupInactive) {
+      this._cleanupInterval = setInterval(() => {
+        this._cleanupInactiveSessions();
+      }, 60000); // Check every minute
+    }
+
     // Handle player drops
     this.framework.fivem.on('playerDropped', () => {
       this.handlePlayerLeft(source);
@@ -143,6 +150,22 @@ class SessionManager {
       return { success: false, reason: 'invalid_session_type' };
     }
 
+    // Remove host from current session first (prevent orphan)
+    const currentSessionId = this.playerSessions.get(host);
+    if (currentSessionId) {
+      await this.removePlayerFromSession(host);
+    }
+
+    // Validate and clamp options (don't trust client)
+    const maxPlayers = Math.min(
+      Math.max(1, parseInt(options.maxPlayers) || sessionType.maxPlayers),
+      sessionType.maxPlayers
+    );
+    const minPlayers = Math.min(
+      Math.max(1, parseInt(options.minPlayers) || sessionType.minPlayers),
+      maxPlayers
+    );
+
     const sessionId = this.generateSessionId();
 
     // Create instance if needed
@@ -150,7 +173,7 @@ class SessionManager {
     if (sessionType.useInstance && this.instanceManager) {
       const instanceResult = await this.instanceManager.createInstance(type, host, {
         sessionId,
-        maxPlayers: options.maxPlayers || sessionType.maxPlayers
+        maxPlayers
       });
 
       if (!instanceResult.success) {
@@ -168,10 +191,10 @@ class SessionManager {
       state: 'waiting', // waiting, active, paused, finished
       players: new Set([host]),
       spectators: new Set(),
-      maxPlayers: options.maxPlayers || sessionType.maxPlayers,
-      minPlayers: options.minPlayers || sessionType.minPlayers,
-      data: options.data || {},
-      metadata: options.metadata || {},
+      maxPlayers,
+      minPlayers,
+      data: {},
+      metadata: {},
       createdAt: Date.now(),
       startedAt: null,
       finishedAt: null,
@@ -199,8 +222,17 @@ class SessionManager {
    */
   async deleteSession(sessionId, reason = 'ended') {
     const session = this.sessions.get(sessionId);
-    if (!session) {
+    if (!session || session._deleting) {
       return { success: false, reason: 'session_not_found' };
+    }
+
+    // Guard against recursive calls (removePlayerFromSession → deleteSession)
+    session._deleting = true;
+
+    // Clear end timer if pending
+    if (session._endTimer) {
+      clearTimeout(session._endTimer);
+      session._endTimer = null;
     }
 
     // Remove all players (copy Set to avoid modification during iteration)
@@ -232,6 +264,11 @@ class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return { success: false, reason: 'session_not_found' };
+    }
+
+    // Reject finished or deleting sessions
+    if (session.state === 'finished' || session._deleting) {
+      return { success: false, reason: 'session_finished' };
     }
 
     const sessionType = this.sessionTypes.get(session.type);
@@ -305,8 +342,8 @@ class SessionManager {
     }
     this.broadcastToSession(sessionId, 'ng_core:session-player-left', source, reason);
 
-    // Check if session should be ended
-    if (session.players.size === 0) {
+    // Check if session should be ended (skip if already being deleted)
+    if (session.players.size === 0 && !session._deleting) {
       await this.deleteSession(sessionId, 'no_players');
     } else if (source === session.host) {
       // Transfer host to another player
@@ -416,8 +453,9 @@ class SessionManager {
 
     this.broadcastToSession(sessionId, 'ng_core:session-ended', sessionId, results);
 
-    // Auto-delete after a delay
-    setTimeout(() => {
+    // Auto-delete after a delay (store ref for cleanup)
+    session._endTimer = setTimeout(() => {
+      session._endTimer = null;
       this.deleteSession(sessionId, 'finished');
     }, 30000); // 30 seconds
 
@@ -494,6 +532,29 @@ class SessionManager {
   }
 
   /**
+   * Cleanup inactive and expired sessions
+   */
+  _cleanupInactiveSessions() {
+    const now = Date.now();
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (session._deleting) continue;
+
+      // Session timeout (max duration exceeded)
+      if (session.startedAt && (now - session.startedAt) > this.config.sessionTimeout) {
+        this.framework.log.info(`Session ${sessionId} expired (timeout)`);
+        this.deleteSession(sessionId, 'timeout');
+        continue;
+      }
+
+      // Inactive timeout (no activity)
+      if ((now - session.lastActivity) > this.config.inactiveTimeout) {
+        this.framework.log.info(`Session ${sessionId} expired (inactive)`);
+        this.deleteSession(sessionId, 'inactive');
+      }
+    }
+  }
+
+  /**
    * Generate unique session ID
    */
   generateSessionId() {
@@ -537,6 +598,12 @@ class SessionManager {
    * Cleanup
    */
   async destroy() {
+    // Stop cleanup interval
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
+
     // End all sessions (copy keys to avoid modification during iteration)
     for (const sessionId of [...this.sessions.keys()]) {
       await this.deleteSession(sessionId, 'shutdown');
