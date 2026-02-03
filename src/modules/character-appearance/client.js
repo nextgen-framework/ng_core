@@ -119,20 +119,58 @@ class CharacterAppearanceClient {
   }
 
   /**
-   * Apply character customization
-   * (Will be expanded later for full customization)
+   * Apply full character customization to ped
+   * Supports: components, props, headBlend, headOverlays, faceFeatures, hairColor, eyeColor
    */
   applyCustomization(appearance) {
     const playerPed = PlayerPedId();
 
-    // Apply components (clothing)
-    if (appearance.components) {
-      for (const [componentId, data] of Object.entries(appearance.components)) {
-        SetPedComponentVariation(playerPed, parseInt(componentId), data.drawable, data.texture, 0);
+    // Set default variation first as baseline
+    SetPedDefaultComponentVariation(playerPed);
+
+    // Apply head blend data (must be set before overlays)
+    if (appearance.headBlend && appearance.headBlend.shapeFirst !== undefined) {
+      SetPedHeadBlendData(
+        playerPed,
+        appearance.headBlend.shapeFirst,
+        appearance.headBlend.shapeSecond,
+        appearance.headBlend.shapeThird || 0,
+        appearance.headBlend.skinFirst,
+        appearance.headBlend.skinSecond,
+        appearance.headBlend.skinThird || 0,
+        appearance.headBlend.shapeMix,
+        appearance.headBlend.skinMix,
+        appearance.headBlend.thirdMix || 0,
+        false
+      );
+    }
+
+    // Apply face features (0-19: nose width, nose peak, chin, etc.)
+    if (appearance.faceFeatures) {
+      for (const [featureId, value] of Object.entries(appearance.faceFeatures)) {
+        SetPedFaceFeature(playerPed, parseInt(featureId), value);
       }
     }
 
-    // Apply props (accessories)
+    // Apply head overlays (0-12: blemishes, beard, eyebrows, ageing, makeup, etc.)
+    if (appearance.headOverlays) {
+      for (const [overlayId, data] of Object.entries(appearance.headOverlays)) {
+        const id = parseInt(overlayId);
+        SetPedHeadOverlay(playerPed, id, data.index ?? 255, data.opacity ?? 1.0);
+        if (data.colorType !== undefined) {
+          SetPedHeadOverlayColor(playerPed, id, data.colorType, data.firstColor ?? 0, data.secondColor ?? 0);
+        }
+      }
+    }
+
+    // Apply components (clothing: 0-11)
+    if (appearance.components) {
+      for (const [componentId, data] of Object.entries(appearance.components)) {
+        SetPedComponentVariation(playerPed, parseInt(componentId), data.drawable, data.texture, data.palette || 0);
+      }
+    }
+
+    // Apply props (accessories: 0-2, 6-7)
     if (appearance.props) {
       for (const [propId, data] of Object.entries(appearance.props)) {
         if (data.drawable === -1) {
@@ -143,26 +181,14 @@ class CharacterAppearanceClient {
       }
     }
 
-    // Apply head blend data (for freemode peds)
-    if (appearance.headBlend && appearance.headBlend.shapeFirst !== undefined) {
-      SetPedHeadBlendData(
-        playerPed,
-        appearance.headBlend.shapeFirst,
-        appearance.headBlend.shapeSecond,
-        0,
-        appearance.headBlend.skinFirst,
-        appearance.headBlend.skinSecond,
-        0,
-        appearance.headBlend.shapeMix,
-        appearance.headBlend.skinMix,
-        0,
-        false
-      );
-    }
-
     // Apply hair color
     if (appearance.hairColor) {
       SetPedHairColor(playerPed, appearance.hairColor[0], appearance.hairColor[1]);
+    }
+
+    // Apply eye color
+    if (appearance.eyeColor !== undefined) {
+      SetPedEyeColor(playerPed, appearance.eyeColor);
     }
   }
 

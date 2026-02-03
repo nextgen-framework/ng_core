@@ -29,7 +29,7 @@ class OrganizationManager {
         await this.loadOrganizations();
 
         // Handle character selection — load player's orgs
-        this.framework.events.on('character:selected', async (source, character) => {
+        this.framework.events.on('character:selected', async ({ source, character }) => {
             await this._loadPlayerOrganizations(source, character.id);
         });
 

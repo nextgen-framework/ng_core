@@ -1,161 +1,154 @@
 /**
  * NextGen Framework - Spawn Manager (Client)
- * Handles player spawning on client side
+ * Handles player spawning mechanics (model, position, collision, fade).
+ * Spawn decisions (where, when) are made by plugins on the server side.
  */
 
 class SpawnManagerClient {
-  constructor(framework) {
-    this.framework = framework;
-    this.hasSpawned = false;
-    this.defaultModel = 'mp_m_freemode_01';
+    constructor(framework) {
+        this.framework = framework;
+        this.hasSpawned = false;
 
-    // Pre-registered at script load time (cerulean)
-    this.netEvents = ['ng_core:spawn-at', 'ng_core:spawn-select'];
-  }
-
-  /**
-   * Initialize spawn manager client
-   */
-  init() {
-    // Listen for spawn events
-    this.framework.onNet('ng_core:spawn-at', this.onSpawnAt.bind(this));
-    this.framework.onNet('ng_core:spawn-select', this.onSpawnSelect.bind(this));
-
-    // Freeze player until spawn
-    const ped = PlayerPedId();
-    if (ped && DoesEntityExist(ped)) {
-      FreezeEntityPosition(ped, true);
-      SetEntityVisible(ped, false, false);
+        // Pre-registered at script load time (cerulean)
+        this.netEvents = ['ng_core:spawn-at'];
     }
 
-    console.log('[Spawn Manager] Client initialized');
-  }
+    /**
+     * Initialize spawn manager client
+     */
+    init() {
+        this.framework.onNet('ng_core:spawn-at', this.onSpawnAt.bind(this));
 
-  /**
-   * Handle spawn at specific coordinates
-   */
-  async onSpawnAt(coords, options) {
-    // Fade out if needed
-    if (options && options.fadeIn) {
-      DoScreenFadeOut(500);
-      await this.delay(500);
+        // Freeze player until spawn
+        const ped = PlayerPedId();
+        if (ped && DoesEntityExist(ped)) {
+            FreezeEntityPosition(ped, true);
+            SetEntityVisible(ped, false, false);
+        }
+
+        console.log('[Spawn Manager] Client initialized');
     }
 
-    // Ensure player has a valid ped model
-    await this.ensurePlayerModel(options?.model || this.defaultModel);
+    /**
+     * Handle spawn at specific coordinates
+     */
+    async onSpawnAt(coords, options) {
+        // Fade out if needed
+        if (options && options.fadeIn) {
+            DoScreenFadeOut(500);
+            await this.delay(500);
+        }
 
-    const playerPed = PlayerPedId();
-    await this.spawnPlayer(playerPed, coords, options || {});
-  }
+        // Load model only if explicitly provided in options
+        if (options?.model) {
+            await this.loadModel(options.model);
+        }
 
-  /**
-   * Ensure player has a valid ped model loaded
-   */
-  async ensurePlayerModel(modelName) {
-    const modelHash = GetHashKey(modelName);
-
-    // Check if model is valid
-    if (!IsModelInCdimage(modelHash) || !IsModelValid(modelHash)) {
-      console.log(`[Spawn Manager] Invalid model: ${modelName}, using default`);
-      return;
+        const playerPed = PlayerPedId();
+        await this.spawnPlayer(playerPed, coords, options || {});
     }
 
-    // Request model
-    RequestModel(modelHash);
+    /**
+     * Load and apply any ped model (freemode, story, animal, etc.)
+     * @param {string} modelName - Model name or hash
+     * @returns {Promise<boolean>} Whether the model was loaded
+     */
+    async loadModel(modelName) {
+        const modelHash = typeof modelName === 'number' ? modelName : GetHashKey(modelName);
 
-    // Wait for model to load
-    let attempts = 0;
-    while (!HasModelLoaded(modelHash) && attempts < 100) {
-      await this.delay(10);
-      attempts++;
+        if (!IsModelInCdimage(modelHash) || !IsModelValid(modelHash)) {
+            console.log(`[Spawn Manager] Invalid model: ${modelName}`);
+            return false;
+        }
+
+        RequestModel(modelHash);
+
+        let attempts = 0;
+        while (!HasModelLoaded(modelHash) && attempts < 100) {
+            await this.delay(10);
+            attempts++;
+        }
+
+        if (!HasModelLoaded(modelHash)) {
+            console.log(`[Spawn Manager] Failed to load model: ${modelName}`);
+            return false;
+        }
+
+        SetPlayerModel(PlayerId(), modelHash);
+        SetModelAsNoLongerNeeded(modelHash);
+        return true;
     }
 
-    if (!HasModelLoaded(modelHash)) {
-      console.log(`[Spawn Manager] Failed to load model: ${modelName}`);
-      return;
+    /**
+     * Spawn player at coordinates
+     */
+    async spawnPlayer(playerPed, coords, options) {
+        // Request collision at spawn point
+        RequestCollisionAtCoord(coords.x, coords.y, coords.z);
+
+        // Set player position
+        SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false);
+        SetEntityHeading(playerPed, coords.heading || 0);
+
+        // Wait for collision to load
+        let attempts = 0;
+        while (!HasCollisionLoadedAroundEntity(playerPed) && attempts < 100) {
+            await this.delay(100);
+            attempts++;
+        }
+
+        // Ground Z correction to prevent spawning under map
+        const [found, groundZ] = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z + 100.0, false);
+        if (found) {
+            SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, groundZ + 1.0, false, false, false);
+            await this.delay(50);
+        }
+
+        // Unfreeze and show player
+        FreezeEntityPosition(playerPed, false);
+        SetEntityVisible(playerPed, true, false);
+
+        // Network culling
+        NetworkSetEntityInvisibleToNetwork(playerPed, false);
+        SetPlayerInvincible(PlayerId(), false);
+
+        // Reset camera
+        RenderScriptCams(false, false, 0, true, true);
+
+        // Fade in
+        if (options.fadeIn) {
+            DoScreenFadeIn(options.fadeDuration || 1500);
+        }
+
+        this.hasSpawned = true;
+
+        // Shut down FiveM loading screen
+        ShutdownLoadingScreen();
+        ShutdownLoadingScreenNui();
+
+        console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
+
+        // Trigger FiveM playerSpawned event
+        emit('playerSpawned');
+
+        // Trigger event for other modules
+        this.framework.fivem.emit('ng_core:player-spawned', coords);
     }
 
-    // Set player model
-    SetPlayerModel(PlayerId(), modelHash);
-    SetModelAsNoLongerNeeded(modelHash);
-
-    console.log(`[Spawn Manager] Player model set: ${modelName}`);
-  }
-
-  /**
-   * Spawn player at coordinates
-   */
-  async spawnPlayer(playerPed, coords, options) {
-    // Request collision at spawn point
-    RequestCollisionAtCoord(coords.x, coords.y, coords.z);
-
-    // Set player position
-    SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false);
-    SetEntityHeading(playerPed, coords.heading || 0);
-
-    // Wait for collision to load
-    let attempts = 0;
-    while (!HasCollisionLoadedAroundEntity(playerPed) && attempts < 100) {
-      await this.delay(100);
-      attempts++;
+    /**
+     * Check if player has spawned
+     * @returns {boolean}
+     */
+    hasPlayerSpawned() {
+        return this.hasSpawned;
     }
 
-    // Unfreeze and show player
-    FreezeEntityPosition(playerPed, false);
-    SetEntityVisible(playerPed, true, false);
-
-    // Network culling
-    NetworkSetEntityInvisibleToNetwork(playerPed, false);
-    SetPlayerInvincible(PlayerId(), false);
-
-    // Reset camera
-    RenderScriptCams(false, false, 0, true, true);
-
-    // Fade in
-    if (options.fadeIn) {
-      DoScreenFadeIn(options.fadeDuration || 1500);
+    /**
+     * Helper delay function
+     */
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
-
-    this.hasSpawned = true;
-
-    // Shut down FiveM loading screen
-    ShutdownLoadingScreen();
-    ShutdownLoadingScreenNui();
-
-    console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
-
-    // Trigger FiveM playerSpawned event (connection-manager listens for this)
-    emit('playerSpawned');
-
-    // Trigger event for other modules
-    this.framework.fivem.emit('ng_core:player-spawned', coords);
-  }
-
-  /**
-   * Helper delay function
-   */
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Handle spawn selection UI
-   */
-  onSpawnSelect(availableSpawns) {
-    // This would show a UI for spawn selection
-    // For now, just pick the first spawn
-    if (availableSpawns.length > 0) {
-      const spawn = availableSpawns[0];
-      this.framework.fivem.emitNet('ng_core:spawn-selected', spawn.id);
-    }
-  }
-
-  /**
-   * Check if player has spawned
-   */
-  hasPlayerSpawned() {
-    return this.hasSpawned;
-  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

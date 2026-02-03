@@ -75,7 +75,7 @@ class ConnectionManager {
     // Stage timeout limits (in milliseconds)
     const STAGE_TIMEOUTS = {
       [this.framework.constants.PlayerStage.CONNECTING]: 45000,    // 45 seconds
-      [this.framework.constants.PlayerStage.LOADING]: 45000,       // 45 seconds
+      [this.framework.constants.PlayerStage.LOADING]: 120000,      // 2 minutes (resource loading can be slow)
       [this.framework.constants.PlayerStage.WAITING_CLIENT]: 35000, // 35 seconds
       [this.framework.constants.PlayerStage.CHECKING]: 30000,      // 30 seconds
       [this.framework.constants.PlayerStage.READY]: 30000,         // 30 seconds

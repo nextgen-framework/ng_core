@@ -79,24 +79,28 @@ class CharacterAppearanceModule {
   }
 
   /**
-   * Get default appearance
+   * Get default appearance for a gender
+   * @param {string} gender - 'm' or 'f'
+   * @returns {Object} Full appearance data
    */
-  getDefaultAppearance() {
+  getDefaultAppearance(gender = 'm') {
+    const isFemale = gender === 'f';
+
     return {
-      model: 'mp_m_freemode_01', // Default male multiplayer ped
+      model: isFemale ? 'mp_f_freemode_01' : 'mp_m_freemode_01',
       components: {
-        0: { drawable: 0, texture: 0 },   // Face
-        1: { drawable: 0, texture: 0 },   // Mask
-        2: { drawable: 0, texture: 0 },   // Hair
-        3: { drawable: 15, texture: 0 },  // Torso/Arms
-        4: { drawable: 14, texture: 0 },  // Legs
-        5: { drawable: 0, texture: 0 },   // Bag
-        6: { drawable: 5, texture: 0 },   // Shoes
-        7: { drawable: 0, texture: 0 },   // Accessories
-        8: { drawable: 15, texture: 0 },  // Undershirt
-        9: { drawable: 0, texture: 0 },   // Armor
-        10: { drawable: 0, texture: 0 },  // Decals
-        11: { drawable: 15, texture: 0 }  // Top
+        0:  { drawable: 0, texture: 0 },                       // Face
+        1:  { drawable: 0, texture: 0 },                       // Mask
+        2:  { drawable: 0, texture: 0 },                       // Hair
+        3:  { drawable: isFemale ? 15 : 15, texture: 0 },      // Torso/Arms
+        4:  { drawable: isFemale ? 15 : 14, texture: 0 },      // Legs
+        5:  { drawable: 0, texture: 0 },                       // Bag
+        6:  { drawable: isFemale ? 5 : 5, texture: 0 },        // Shoes
+        7:  { drawable: 0, texture: 0 },                       // Accessories
+        8:  { drawable: isFemale ? 15 : 15, texture: 0 },      // Undershirt
+        9:  { drawable: 0, texture: 0 },                       // Armor
+        10: { drawable: 0, texture: 0 },                       // Decals
+        11: { drawable: isFemale ? 15 : 15, texture: 0 }       // Top
       },
       props: {
         0: { drawable: -1, texture: 0 },  // Hat
@@ -108,14 +112,37 @@ class CharacterAppearanceModule {
       headBlend: {
         shapeFirst: 0,
         shapeSecond: 0,
+        shapeThird: 0,
         skinFirst: 0,
         skinSecond: 0,
+        skinThird: 0,
         shapeMix: 0.5,
-        skinMix: 0.5
+        skinMix: 0.5,
+        thirdMix: 0.0
       },
-      headOverlay: {},
-      faceFeatures: {},
-      hairColor: [0, 0]
+      headOverlays: {
+        0:  { index: 255, opacity: 1.0 },                             // Blemishes
+        1:  { index: 255, opacity: 1.0, colorType: 1, firstColor: 0, secondColor: 0 }, // Facial Hair
+        2:  { index: 255, opacity: 1.0, colorType: 1, firstColor: 0, secondColor: 0 }, // Eyebrows
+        3:  { index: 255, opacity: 1.0 },                             // Ageing
+        4:  { index: 255, opacity: 1.0, colorType: 2, firstColor: 0, secondColor: 0 }, // Makeup
+        5:  { index: 255, opacity: 1.0, colorType: 2, firstColor: 0, secondColor: 0 }, // Blush
+        6:  { index: 255, opacity: 1.0 },                             // Complexion
+        7:  { index: 255, opacity: 1.0 },                             // Sun Damage
+        8:  { index: 255, opacity: 1.0, colorType: 2, firstColor: 0, secondColor: 0 }, // Lipstick
+        9:  { index: 255, opacity: 1.0 },                             // Moles/Freckles
+        10: { index: 255, opacity: 1.0, colorType: 1, firstColor: 0, secondColor: 0 }, // Chest Hair
+        11: { index: 255, opacity: 1.0 },                             // Body Blemishes
+        12: { index: 255, opacity: 1.0 }                              // Extra Body Blemishes
+      },
+      faceFeatures: {
+        0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0,   // Nose
+        5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0,   // Eyebrows, Cheeks
+        10: 0.0, 11: 0.0, 12: 0.0, 13: 0.0, 14: 0.0, // Chin, Eyes
+        15: 0.0, 16: 0.0, 17: 0.0, 18: 0.0, 19: 0.0  // Jaw, Lips, Neck
+      },
+      hairColor: [0, 0],
+      eyeColor: 0
     };
   }
 

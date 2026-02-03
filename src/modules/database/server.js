@@ -115,17 +115,41 @@ class Database {
   }
 
   /**
-   * Initialize oxmysql backend (legacy)
+   * Initialize oxmysql backend
    */
   async initOxMySQLBackend() {
     try {
-      await this.backend.query('SELECT 1');
+      const result = await this._oxCall('query', 'SELECT 1');
+      if (result === null || result === undefined) {
+        throw new Error('oxmysql returned null - connection not ready');
+      }
       this.connected = true;
-      this.framework.log.info('Database connected via oxmysql (legacy, consider switching to HTTP API)');
+      this.framework.log.info('Database connected via oxmysql');
     } catch (error) {
       this.framework.log.warn(`oxmysql connection failed: ${error.message} - Using fallback mode`);
       this.connected = false;
     }
+  }
+
+  /**
+   * Call oxmysql export using callback pattern
+   * FiveM cross-resource async exports don't return values properly with await.
+   * The callback pattern is the only reliable way to get results.
+   * @param {string} method - oxmysql export name (query, execute, insert, update, scalar)
+   * @param {string} sql - SQL statement
+   * @param {Array} params - Query parameters
+   * @returns {Promise<*>} Query result
+   */
+  _oxCall(method, sql, params = []) {
+    return new Promise((resolve, reject) => {
+      try {
+        global.exports['oxmysql'][method](sql, params, (result) => {
+          resolve(result);
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -177,8 +201,7 @@ class Database {
         const response = await this.httpRequest('POST', '/query', { sql, params });
         return response.data.data || [];
       } else if (this.backendType === 'oxmysql') {
-        const result = await this.backend.query(sql, params);
-        // Ensure we always return an array
+        const result = await this._oxCall('query', sql, params);
         return Array.isArray(result) ? result : [];
       }
       throw new Error('Unsupported backend');
@@ -204,15 +227,14 @@ class Database {
         const response = await this.httpRequest('POST', '/execute', { sql, params });
         return response.data;
       } else if (this.backendType === 'oxmysql') {
-        const result = await this.backend.execute(sql, params);
-        // oxmysql may return a number (affectedRows) directly or an object
+        const result = await this._oxCall('execute', sql, params);
+        // oxmysql execute returns { affectedRows, insertId, ... }
         if (typeof result === 'number') {
-          return { affectedRows: result, insertId: result };
+          return { affectedRows: result, insertId: 0 };
         }
-        // Ensure we always return an object with the expected properties
         return {
           affectedRows: result?.affectedRows ?? result?.changedRows ?? 0,
-          insertId: result?.insertId ?? result?.lastInsertId ?? 0
+          insertId: result?.insertId ?? 0
         };
       }
       throw new Error('Unsupported backend');
