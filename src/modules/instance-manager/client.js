@@ -155,6 +155,15 @@ class InstanceManagerClient {
   getPendingInvites() {
     return this.pendingInvites;
   }
+
+  /**
+   * Cleanup
+   */
+  async destroy() {
+    this.currentInstance = null;
+    this.pendingInvites = [];
+    this.framework.log.info('Instance Manager client destroyed');
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -215,6 +215,15 @@ class CharacterAppearanceClient {
   wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  /**
+   * Cleanup
+   */
+  async destroy() {
+    this.currentAppearance = null;
+    this.isApplying = false;
+    this.framework.log.info('Character Appearance client destroyed');
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

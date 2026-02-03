@@ -229,6 +229,15 @@ class SessionManagerClient {
       this.framework.fivem.emitNet('ng_core:session-start');
     }
   }
+
+  /**
+   * Cleanup
+   */
+  async destroy() {
+    this.currentSession = null;
+    this.isSpectating = false;
+    this.framework.log.info('Session Manager client destroyed');
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -119,6 +119,19 @@ class SyncManagerClient {
             }
         });
     }
+
+    /**
+     * Cleanup
+     */
+    async destroy() {
+        if (this._densityTick) {
+            clearTick(this._densityTick);
+            this._densityTick = null;
+        }
+        this.trafficDensity = 1.0;
+        this.pedestrianDensity = 1.0;
+        this.framework.log.info('Sync Manager client destroyed');
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -149,6 +149,14 @@ class SpawnManagerClient {
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    /**
+     * Cleanup
+     */
+    async destroy() {
+        this.hasSpawned = false;
+        this.framework.log.info('Spawn Manager client destroyed');
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
