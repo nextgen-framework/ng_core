@@ -72,7 +72,7 @@ class EventBus {
             try {
                 cb(...args);
             } catch (err) {
-                console.log(`[Events] ERROR on "${event}": ${err.message}`);
+                console.error(`[Events] ERROR on "${event}": ${err.message}`);
             }
         }
     }
@@ -92,7 +92,7 @@ class EventBus {
                 const val = await cb(result);
                 if (val !== undefined) result = val;
             } catch (err) {
-                console.log(`[Events] ERROR on "${event}": ${err.message}`);
+                console.error(`[Events] ERROR on "${event}": ${err.message}`);
             }
         }
         return result;
@@ -134,6 +134,7 @@ class ModuleRegistry {
         this.eventBus = this.events;
 
         // FiveM native event wrappers (uses captured references)
+        const registry = this;
         const netHandlers = new Map();
         this.fivem = {
             onNet(event, handler, priority = 10) {
@@ -143,7 +144,7 @@ class ModuleRegistry {
                     _onNet(event, (...args) => {
                         for (const h of netHandlers.get(event)) {
                             try { h.fn(...args); } catch (err) {
-                                console.log(`[Kernel] ERROR on net "${event}": ${err.message}`);
+                                registry.log.error(`Net handler error on "${event}": ${err.message}`);
                             }
                         }
                     });
@@ -216,7 +217,7 @@ class ModuleRegistry {
      */
     register(name, instance, priority = 10) {
         if (this._modules.has(name)) {
-            console.log(`[Kernel] "${name}" already registered, skipping`);
+            this.log.warn(`"${name}" already registered, skipping`);
             return;
         }
 
@@ -256,15 +257,15 @@ class ModuleRegistry {
                     await entry.instance.init();
                 }
                 this._modules.set(entry.name, entry.instance);
-                console.log(`[Kernel] Module "${entry.name}" loaded (priority ${entry.priority})`);
+                this.log.debug(`Module "${entry.name}" loaded (priority ${entry.priority})`);
             } catch (err) {
-                console.log(`[Kernel] ERROR loading module "${entry.name}": ${err.message}`);
+                this.log.error(`Failed to load module "${entry.name}": ${err.message}`);
             }
         }
 
         this._queue = [];
         this._ready = true;
-        console.log(`[Kernel] Ready (${this._modules.size} modules)`);
+        this.log.info(`Ready (${this._modules.size} modules)`);
     }
 
     /**
@@ -279,9 +280,9 @@ class ModuleRegistry {
                 if (typeof instance.destroy === 'function') {
                     await instance.destroy();
                 }
-                console.log(`[Kernel] Module "${name}" destroyed`);
+                this.log.debug(`Module "${name}" destroyed`);
             } catch (err) {
-                console.log(`[Kernel] ERROR destroying module "${name}": ${err.message}`);
+                this.log.error(`Failed to destroy module "${name}": ${err.message}`);
             }
         }
 
