@@ -333,6 +333,19 @@ class ModuleRegistry {
 const Framework = new ModuleRegistry();
 global.Framework = Framework;
 
+/**
+ * Cross-resource export proxy factory
+ * @param {string} resource - Resource name to proxy
+ * @returns {Proxy} Callable proxy: Use('ng_core').RegisterRPC(...)
+ */
+global.Use = function(resource) {
+    return new Proxy({}, {
+        get(_, prop) {
+            return (...args) => exports[resource][prop](...args);
+        }
+    });
+};
+
 // Auto-start: wait for all scripts to register() then init
 setImmediate(() => Framework.init());
 
@@ -341,11 +354,6 @@ on('onResourceStop', async (resourceName) => {
     if (resourceName !== GetCurrentResourceName()) return;
     await Framework.destroy();
 });
-
-// Register kernel resource name for bridge auto-detection (server only)
-if (typeof SetConvar !== 'undefined') {
-    SetConvar('ng_kernel_resource', GetCurrentResourceName());
-}
 
 // FiveM exports
 exports('GetFramework', () => Framework);
