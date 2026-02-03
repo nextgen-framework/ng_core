@@ -1,7 +1,7 @@
 -- NextGen Framework - Core module tables
 -- admins, characters, player_money, transactions, persistent_entities,
--- whitelist, queue_settings, containers, container_items, player_positions,
--- spawn_points, vehicles, organizations, organization_employees,
+-- whitelist, queue_settings, containers, container_items,
+-- vehicles, organizations, organization_employees,
 -- vehicle_keys, door_states, container_access, property_keys, generic_access
 
 -- ================================
@@ -130,11 +130,7 @@ CREATE TABLE IF NOT EXISTS generic_access (
 CREATE TABLE IF NOT EXISTS characters (
     id INT AUTO_INCREMENT PRIMARY KEY,
     identifier VARCHAR(128) NOT NULL,
-    firstname VARCHAR(20) NOT NULL,
-    lastname VARCHAR(20) NOT NULL,
-    dob VARCHAR(10) DEFAULT NULL,
-    gender VARCHAR(1) NOT NULL DEFAULT 'm',
-    height INT NOT NULL DEFAULT 180,
+    data JSON DEFAULT NULL,
     metadata JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -191,31 +187,6 @@ CREATE TABLE IF NOT EXISTS container_items (
     FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- spawn-manager module
-CREATE TABLE IF NOT EXISTS player_positions (
-    identifier VARCHAR(128) PRIMARY KEY,
-    x DOUBLE NOT NULL DEFAULT 0,
-    y DOUBLE NOT NULL DEFAULT 0,
-    z DOUBLE NOT NULL DEFAULT 0,
-    heading FLOAT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS spawn_points (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(64) NOT NULL,
-    category VARCHAR(32) NOT NULL DEFAULT 'default',
-    x DOUBLE NOT NULL DEFAULT 0,
-    y DOUBLE NOT NULL DEFAULT 0,
-    z DOUBLE NOT NULL DEFAULT 0,
-    heading FLOAT NOT NULL DEFAULT 0,
-    metadata JSON DEFAULT NULL,
-    enabled TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_spawn_points_category (category),
-    INDEX idx_spawn_points_enabled (enabled)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================
 -- Layer 17 : High-Level

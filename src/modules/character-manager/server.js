@@ -1,6 +1,10 @@
 /**
  * NextGen Framework - Character Manager Module
  * Manages player characters (creation, deletion, selection)
+ *
+ * Table schema: characters(id, identifier, data JSON, metadata JSON, created_at, last_played)
+ *   data     = personalized info (firstname, lastname, dob, gender, height, appearance)
+ *   metadata = in-game state (position, health, armor)
  */
 
 class CharacterManager {
@@ -10,7 +14,7 @@ class CharacterManager {
     this.playerManager = null;
 
     // Active characters cache
-    this.activeCharacters = new Map(); // source => character data
+    this.activeCharacters = new Map(); // source => character object
 
     // Configuration
     this.config = {
@@ -50,11 +54,47 @@ class CharacterManager {
   }
 
   // ================================
+  // Internal helpers
+  // ================================
+
+  /**
+   * Parse JSON field from DB (handles string or object)
+   * @param {*} value - DB JSON field
+   * @returns {Object}
+   */
+  _parseJson(value) {
+    if (!value) return {};
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  }
+
+  /**
+   * Build character object from DB row
+   * @param {Object} row - DB row
+   * @returns {Object} Character object
+   */
+  _buildCharacter(row) {
+    const data = this._parseJson(row.data);
+    const metadata = this._parseJson(row.metadata);
+
+    return {
+      id: row.id,
+      identifier: row.identifier,
+      data,
+      metadata,
+      fullname: `${data.firstname || ''} ${data.lastname || ''}`.trim(),
+      created_at: row.created_at,
+      last_played: row.last_played
+    };
+  }
+
+  // ================================
   // Character Management
   // ================================
 
   /**
    * Get all characters for a player
+   * @param {number} source - Player source
+   * @returns {Promise<Array>}
    */
   async getPlayerCharacters(source) {
     try {
@@ -64,24 +104,12 @@ class CharacterManager {
       const identifier = player.getIdentifier('license');
       if (!identifier) return [];
 
-      const characters = await this.db.query(
-        'SELECT id, firstname, lastname, dob, gender, height, metadata, created_at, last_played FROM characters WHERE identifier = ? ORDER BY last_played DESC',
+      const rows = await this.db.query(
+        'SELECT id, identifier, data, metadata, created_at, last_played FROM characters WHERE identifier = ? ORDER BY last_played DESC',
         [identifier]
       );
 
-      return characters.map(char => ({
-        id: char.id,
-        firstname: char.firstname,
-        lastname: char.lastname,
-        fullname: `${char.firstname} ${char.lastname}`,
-        dob: char.dob,
-        gender: char.gender,
-        height: char.height,
-        age: this.calculateAge(char.dob),
-        metadata: typeof char.metadata === 'string' ? JSON.parse(char.metadata) : char.metadata,
-        created_at: char.created_at,
-        last_played: char.last_played
-      }));
+      return rows.map(row => this._buildCharacter(row));
     } catch (error) {
       this.framework.log.error(`Failed to get player characters: ${error.message}`);
       return [];
@@ -90,6 +118,9 @@ class CharacterManager {
 
   /**
    * Create new character
+   * @param {number} source - Player source
+   * @param {Object} characterData - { firstname, lastname, dob, gender, height }
+   * @returns {Promise<Object>}
    */
   async createCharacter(source, characterData) {
     try {
@@ -121,43 +152,40 @@ class CharacterManager {
         return { success: false, reason: 'invalid_age' };
       }
 
+      // Build data (personalized info)
+      const data = {
+        firstname: characterData.firstname,
+        lastname: characterData.lastname,
+        dob: characterData.dob,
+        gender: characterData.gender || 'm',
+        height: characterData.height || 180
+      };
+
+      // Build metadata (in-game state defaults)
+      const metadata = { health: 200, armor: 0 };
+
       // Create character
       const result = await this.db.execute(
-        'INSERT INTO characters (identifier, firstname, lastname, dob, gender, height, metadata, created_at, last_played) ' +
-        'VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
-        [
-          identifier,
-          characterData.firstname,
-          characterData.lastname,
-          characterData.dob,
-          characterData.gender || 'm',
-          characterData.height || 180,
-          JSON.stringify(characterData.metadata || {})
-        ]
+        'INSERT INTO characters (identifier, data, metadata, created_at, last_played) VALUES (?, ?, ?, NOW(), NOW())',
+        [identifier, JSON.stringify(data), JSON.stringify(metadata)]
       );
 
       const characterId = result.insertId;
 
-      this.framework.log.info(`Created character: ${characterData.firstname} ${characterData.lastname} (ID: ${characterId})`);
+      this.framework.log.info(`Created character: ${data.firstname} ${data.lastname} (ID: ${characterId})`);
 
       // Trigger hook for other modules (e.g., money-manager to create account)
       await this.framework.events.pipe('character:created', { source, characterId, characterData });
 
-      return {
-        success: true,
-        characterId,
-        character: {
-          id: characterId,
-          firstname: characterData.firstname,
-          lastname: characterData.lastname,
-          fullname: `${characterData.firstname} ${characterData.lastname}`,
-          dob: characterData.dob,
-          gender: characterData.gender || 'm',
-          height: characterData.height || 180,
-          age,
-          metadata: characterData.metadata || {}
-        }
+      const character = {
+        id: characterId,
+        identifier,
+        data,
+        metadata,
+        fullname: `${data.firstname} ${data.lastname}`
       };
+
+      return { success: true, characterId, character };
     } catch (error) {
       this.framework.log.error(`Failed to create character: ${error.message}`);
       return { success: false, reason: 'database_error', error: error.message };
@@ -166,6 +194,9 @@ class CharacterManager {
 
   /**
    * Select character
+   * @param {number} source - Player source
+   * @param {number} characterId - Character ID
+   * @returns {Promise<Object>}
    */
   async selectCharacter(source, characterId) {
     try {
@@ -180,16 +211,14 @@ class CharacterManager {
       }
 
       // Get character
-      const characters = await this.db.query(
+      const rows = await this.db.query(
         'SELECT * FROM characters WHERE id = ? AND identifier = ?',
         [characterId, identifier]
       );
 
-      if (characters.length === 0) {
+      if (rows.length === 0) {
         return { success: false, reason: 'character_not_found' };
       }
-
-      const char = characters[0];
 
       // Update last played
       await this.db.execute(
@@ -197,18 +226,7 @@ class CharacterManager {
         [characterId]
       );
 
-      // Build character object
-      const character = {
-        id: char.id,
-        firstname: char.firstname,
-        lastname: char.lastname,
-        fullname: `${char.firstname} ${char.lastname}`,
-        dob: char.dob,
-        gender: char.gender,
-        height: char.height,
-        age: this.calculateAge(char.dob),
-        metadata: typeof char.metadata === 'string' ? JSON.parse(char.metadata) : char.metadata
-      };
+      const character = this._buildCharacter(rows[0]);
 
       // Cache active character
       this.activeCharacters.set(source, character);
@@ -227,6 +245,9 @@ class CharacterManager {
 
   /**
    * Delete character
+   * @param {number} source - Player source
+   * @param {number} characterId - Character ID
+   * @returns {Promise<Object>}
    */
   async deleteCharacter(source, characterId) {
     try {
@@ -241,12 +262,12 @@ class CharacterManager {
       }
 
       // Verify ownership
-      const characters = await this.db.query(
+      const rows = await this.db.query(
         'SELECT id FROM characters WHERE id = ? AND identifier = ?',
         [characterId, identifier]
       );
 
-      if (characters.length === 0) {
+      if (rows.length === 0) {
         return { success: false, reason: 'character_not_found' };
       }
 
@@ -269,86 +290,19 @@ class CharacterManager {
   }
 
   /**
-   * Update character data
-   */
-  async updateCharacter(characterId, data) {
-    try {
-      const updates = [];
-      const values = [];
-
-      if (data.firstname !== undefined) {
-        updates.push('firstname = ?');
-        values.push(data.firstname);
-      }
-      if (data.lastname !== undefined) {
-        updates.push('lastname = ?');
-        values.push(data.lastname);
-      }
-      if (data.dob !== undefined) {
-        updates.push('dob = ?');
-        values.push(data.dob);
-      }
-      if (data.gender !== undefined) {
-        updates.push('gender = ?');
-        values.push(data.gender);
-      }
-      if (data.height !== undefined) {
-        updates.push('height = ?');
-        values.push(data.height);
-      }
-      if (data.metadata !== undefined) {
-        updates.push('metadata = ?');
-        values.push(JSON.stringify(data.metadata));
-      }
-
-      if (updates.length === 0) {
-        return { success: false, reason: 'no_updates' };
-      }
-
-      values.push(characterId);
-
-      await this.db.execute(
-        `UPDATE characters SET ${updates.join(', ')} WHERE id = ?`,
-        values
-      );
-
-      this.framework.log.debug(`Updated character ${characterId}`);
-
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to update character: ${error.message}`);
-      return { success: false, reason: 'database_error', error: error.message };
-    }
-  }
-
-  /**
    * Get character by ID
+   * @param {number} characterId - Character ID
+   * @returns {Promise<Object|null>}
    */
   async getCharacterById(characterId) {
     try {
-      const characters = await this.db.query(
+      const rows = await this.db.query(
         'SELECT * FROM characters WHERE id = ?',
         [characterId]
       );
 
-      if (characters.length === 0) return null;
-
-      const char = characters[0];
-
-      return {
-        id: char.id,
-        identifier: char.identifier,
-        firstname: char.firstname,
-        lastname: char.lastname,
-        fullname: `${char.firstname} ${char.lastname}`,
-        dob: char.dob,
-        gender: char.gender,
-        height: char.height,
-        age: this.calculateAge(char.dob),
-        metadata: typeof char.metadata === 'string' ? JSON.parse(char.metadata) : char.metadata,
-        created_at: char.created_at,
-        last_played: char.last_played
-      };
+      if (rows.length === 0) return null;
+      return this._buildCharacter(rows[0]);
     } catch (error) {
       this.framework.log.error(`Failed to get character: ${error.message}`);
       return null;
@@ -357,27 +311,80 @@ class CharacterManager {
 
   /**
    * Get active character for player
+   * @param {number} source - Player source
+   * @returns {Object|null}
    */
   getActiveCharacter(source) {
     return this.activeCharacters.get(source) || null;
   }
 
+  // ================================
+  // Data & Metadata Updates
+  // ================================
+
   /**
-   * Set character metadata
+   * Merge keys into character data (personalized info)
+   * @param {number} characterId - Character ID
+   * @param {Object} partial - Key-value pairs to merge
+   * @returns {Promise<Object>}
    */
-  async setCharacterMetadata(characterId, key, value) {
+  async mergeCharacterData(characterId, partial) {
     try {
       const char = await this.getCharacterById(characterId);
       if (!char) return { success: false, reason: 'character_not_found' };
 
-      const metadata = char.metadata || {};
-      metadata[key] = value;
+      const data = { ...char.data, ...partial };
 
-      await this.updateCharacter(characterId, { metadata });
+      await this.db.execute(
+        'UPDATE characters SET data = ? WHERE id = ?',
+        [JSON.stringify(data), characterId]
+      );
+
+      // Update cache
+      for (const [src, cached] of this.activeCharacters) {
+        if (cached.id === characterId) {
+          cached.data = data;
+          cached.fullname = `${data.firstname || ''} ${data.lastname || ''}`.trim();
+          break;
+        }
+      }
 
       return { success: true };
     } catch (error) {
-      this.framework.log.error(`Failed to set character metadata: ${error.message}`);
+      this.framework.log.error(`Failed to merge character data: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Merge keys into character metadata (in-game state)
+   * @param {number} characterId - Character ID
+   * @param {Object} partial - Key-value pairs to merge
+   * @returns {Promise<Object>}
+   */
+  async mergeCharacterMetadata(characterId, partial) {
+    try {
+      const char = await this.getCharacterById(characterId);
+      if (!char) return { success: false, reason: 'character_not_found' };
+
+      const metadata = { ...char.metadata, ...partial };
+
+      await this.db.execute(
+        'UPDATE characters SET metadata = ? WHERE id = ?',
+        [JSON.stringify(metadata), characterId]
+      );
+
+      // Update cache
+      for (const [src, cached] of this.activeCharacters) {
+        if (cached.id === characterId) {
+          cached.metadata = metadata;
+          break;
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      this.framework.log.error(`Failed to merge character metadata: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -388,38 +395,33 @@ class CharacterManager {
 
   /**
    * Validate character data
+   * @param {Object} data - Character creation data
+   * @returns {Object} { valid, errors }
    */
   validateCharacterData(data) {
     const errors = [];
 
-    // Firstname
     if (!data.firstname || typeof data.firstname !== 'string') {
       errors.push('firstname_required');
     } else if (data.firstname.length < this.config.minFirstNameLength || data.firstname.length > this.config.maxFirstNameLength) {
       errors.push('firstname_invalid_length');
     }
 
-    // Lastname
     if (!data.lastname || typeof data.lastname !== 'string') {
       errors.push('lastname_required');
     } else if (data.lastname.length < this.config.minLastNameLength || data.lastname.length > this.config.maxLastNameLength) {
       errors.push('lastname_invalid_length');
     }
 
-    // Date of birth
     if (!data.dob || !this.isValidDate(data.dob)) {
       errors.push('dob_invalid');
     }
 
-    // Gender
     if (data.gender && !['m', 'f'].includes(data.gender)) {
       errors.push('gender_invalid');
     }
 
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+    return { valid: errors.length === 0, errors };
   }
 
   /**
@@ -462,14 +464,12 @@ class CharacterManager {
       const stats = await this.db.query(
         'SELECT COUNT(*) as total_characters, COUNT(DISTINCT identifier) as unique_players FROM characters'
       );
-
       return stats[0] || {};
     } catch (error) {
       this.framework.log.error(`Failed to get stats: ${error.message}`);
       return {};
     }
   }
-
 
   /**
    * Cleanup

@@ -140,14 +140,30 @@ class Database {
    * @param {Array} params - Query parameters
    * @returns {Promise<*>} Query result
    */
-  _oxCall(method, sql, params = []) {
+  _oxCall(method, sql, params = [], timeout = 30000) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error(`oxmysql ${method} timed out after ${timeout}ms`));
+        }
+      }, timeout);
+
       try {
         global.exports['oxmysql'][method](sql, params, (result) => {
-          resolve(result);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(result);
+          }
         });
       } catch (error) {
-        reject(error);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        }
       }
     });
   }
