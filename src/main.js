@@ -305,7 +305,7 @@ class ModuleRegistry {
     }
 
     /**
-     * Expose module methods as FiveM exports (bridge pattern)
+     * Expose module methods as FiveM exports
      * @param {string} moduleName - Module to proxy
      * @param {Object} mappings - { ExportName: 'method' } or { ExportName: { method, fallback } }
      */
