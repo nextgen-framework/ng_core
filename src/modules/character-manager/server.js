@@ -174,7 +174,7 @@ class CharacterManager {
 
       this.framework.log.info(`Created character: ${data.firstname} ${data.lastname} (ID: ${characterId})`);
 
-      // Trigger hook for other modules (e.g., money-manager to create account)
+      // Trigger hook for other modules
       await this.framework.events.pipe('character:created', { source, characterId, characterData });
 
       const character = {

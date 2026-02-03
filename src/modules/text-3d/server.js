@@ -1,12 +1,12 @@
 /**
  * NextGen Framework - 3D Text Module (Server)
- * Persistent 3D text points with groups and client sync
+ * In-memory 3D text points with groups and client sync
+ * No database — plugins register points via API at runtime
  */
 
 class Text3DManager {
     constructor(framework) {
         this.framework = framework;
-        this.db = null;
 
         // All points: id => pointData
         this.points = new Map();
@@ -14,19 +14,14 @@ class Text3DManager {
         // Group visibility: groupName => boolean
         this.groups = new Map();
 
-        // Auto-increment for runtime points (negative IDs)
-        this.runtimeId = -1;
+        // Auto-increment ID
+        this.nextId = 1;
     }
 
     /**
      * Initialize 3D text manager
      */
     async init() {
-        this.db = this.framework.getModule('database');
-
-        // Load persistent points from DB
-        await this._loadFromDb();
-
         // Sync points to players on connect
         this.framework.fivem.onNet('ng_core:text3d:requestAll', () => {
             const src = global.source;
@@ -41,7 +36,7 @@ class Text3DManager {
             });
         }
 
-        this.framework.log.info(`3D text manager initialized (${this.points.size} points loaded)`);
+        this.framework.log.info('3D text manager initialized');
     }
 
     // ================================
@@ -49,7 +44,7 @@ class Text3DManager {
     // ================================
 
     /**
-     * Create a persistent 3D text point (saved to DB)
+     * Create a 3D text point
      * @param {Object} data
      * @param {string} data.text - Text to display
      * @param {number} data.x - X coordinate
@@ -62,54 +57,8 @@ class Text3DManager {
      * @param {number} [data.renderDistance=20.0] - Max render distance
      * @returns {Object} { success, id }
      */
-    async createPoint(data) {
-        const color = data.color || { r: 255, g: 255, b: 255, a: 255 };
-
-        try {
-            const result = await this.db.execute(
-                `INSERT INTO text3d_points (text, x, y, z, group_name, font, scale, color_r, color_g, color_b, color_a, render_distance)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    data.text,
-                    data.x, data.y, data.z,
-                    data.group || 'default',
-                    data.font || 0,
-                    data.scale || 0.35,
-                    color.r, color.g, color.b, color.a,
-                    data.renderDistance || 20.0
-                ]
-            );
-
-            const point = {
-                id: result.insertId,
-                text: data.text,
-                x: data.x, y: data.y, z: data.z,
-                group: data.group || 'default',
-                font: data.font || 0,
-                scale: data.scale || 0.35,
-                color,
-                renderDistance: data.renderDistance || 20.0,
-                isActive: true
-            };
-
-            this.points.set(point.id, point);
-            this._broadcastPointAdd(point);
-
-            this.framework.log.debug(`3D text created: "${data.text}" (id: ${point.id})`);
-            return { success: true, id: point.id };
-        } catch (error) {
-            this.framework.log.error(`Failed to create 3D text: ${error.message}`);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * Create a runtime-only 3D text point (not saved to DB)
-     * @param {Object} data - Same as createPoint
-     * @returns {Object} { success, id }
-     */
-    createRuntimePoint(data) {
-        const id = this.runtimeId--;
+    createPoint(data) {
+        const id = this.nextId++;
         const color = data.color || { r: 255, g: 255, b: 255, a: 255 };
 
         const point = {
@@ -127,24 +76,17 @@ class Text3DManager {
         this.points.set(id, point);
         this._broadcastPointAdd(point);
 
+        this.framework.log.debug(`3D text created: "${data.text}" (id: ${id})`);
         return { success: true, id };
     }
 
     /**
      * Remove a 3D text point
      * @param {number} id
+     * @returns {Object}
      */
-    async removePoint(id) {
+    removePoint(id) {
         if (!this.points.has(id)) return { success: false, reason: 'not_found' };
-
-        // Delete from DB if persistent
-        if (id > 0 && this.db) {
-            try {
-                await this.db.execute('DELETE FROM text3d_points WHERE id = ?', [id]);
-            } catch (error) {
-                this.framework.log.error(`Failed to delete 3D text from DB: ${error.message}`);
-            }
-        }
 
         this.points.delete(id);
         this._broadcastPointRemove(id);
@@ -156,12 +98,12 @@ class Text3DManager {
      * Update a 3D text point
      * @param {number} id
      * @param {Object} data - Fields to update
+     * @returns {Object}
      */
-    async updatePoint(id, data) {
+    updatePoint(id, data) {
         const point = this.points.get(id);
         if (!point) return { success: false, reason: 'not_found' };
 
-        // Update fields
         if (data.text !== undefined) point.text = data.text;
         if (data.x !== undefined) point.x = data.x;
         if (data.y !== undefined) point.y = data.y;
@@ -172,25 +114,6 @@ class Text3DManager {
         if (data.color !== undefined) point.color = data.color;
         if (data.renderDistance !== undefined) point.renderDistance = data.renderDistance;
         if (data.isActive !== undefined) point.isActive = data.isActive;
-
-        // Persist if DB point
-        if (id > 0 && this.db) {
-            try {
-                await this.db.execute(
-                    `UPDATE text3d_points SET text = ?, x = ?, y = ?, z = ?, group_name = ?, font = ?,
-                     scale = ?, color_r = ?, color_g = ?, color_b = ?, color_a = ?, render_distance = ?, is_active = ?
-                     WHERE id = ?`,
-                    [
-                        point.text, point.x, point.y, point.z,
-                        point.group, point.font, point.scale,
-                        point.color.r, point.color.g, point.color.b, point.color.a,
-                        point.renderDistance, point.isActive ? 1 : 0, id
-                    ]
-                );
-            } catch (error) {
-                this.framework.log.error(`Failed to update 3D text in DB: ${error.message}`);
-            }
-        }
 
         this._broadcastPointUpdate(point);
         return { success: true };
@@ -269,32 +192,8 @@ class Text3DManager {
     }
 
     // ================================
-    // Internal
+    // Cleanup
     // ================================
-
-    async _loadFromDb() {
-        if (!this.db || !this.db.isConnected()) return;
-
-        try {
-            const rows = await this.db.query('SELECT * FROM text3d_points WHERE is_active = 1');
-
-            for (const row of rows) {
-                this.points.set(row.id, {
-                    id: row.id,
-                    text: row.text,
-                    x: row.x, y: row.y, z: row.z,
-                    group: row.group_name,
-                    font: row.font,
-                    scale: row.scale,
-                    color: { r: row.color_r, g: row.color_g, b: row.color_b, a: row.color_a },
-                    renderDistance: row.render_distance,
-                    isActive: true
-                });
-            }
-        } catch (error) {
-            this.framework.log.error(`Failed to load 3D text from DB: ${error.message}`);
-        }
-    }
 
     async destroy() {
         this.points.clear();

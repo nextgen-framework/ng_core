@@ -1,8 +1,7 @@
 -- NextGen Framework - Core module tables
--- admins, characters, player_money, transactions, persistent_entities,
+-- admins, characters, balances, persistent_entities,
 -- whitelist, queue_settings, containers, container_items,
--- vehicles, organizations, organization_employees,
--- vehicle_keys, door_states, container_access, property_keys, generic_access
+-- vehicles, organizations, organization_employees, generic_access
 
 -- ================================
 -- Layer 0-2 : Foundation / Infrastructure
@@ -69,47 +68,7 @@ CREATE TABLE IF NOT EXISTS admins (
     INDEX idx_admins_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- access-manager module
-CREATE TABLE IF NOT EXISTS vehicle_keys (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    vehicle_id VARCHAR(64) NOT NULL,
-    identifier VARCHAR(128) NOT NULL,
-    granted_by VARCHAR(64) DEFAULT NULL,
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL DEFAULT NULL,
-    UNIQUE KEY uk_vehicle_keys (vehicle_id, identifier),
-    INDEX idx_vehicle_keys_identifier (identifier)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS door_states (
-    door_id VARCHAR(64) PRIMARY KEY,
-    locked TINYINT(1) NOT NULL DEFAULT 1,
-    owner VARCHAR(128) DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_toggled_at TIMESTAMP NULL DEFAULT NULL,
-    last_toggled_by VARCHAR(128) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS container_access (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    container_id INT NOT NULL,
-    identifier VARCHAR(128) NOT NULL,
-    granted_by VARCHAR(64) DEFAULT NULL,
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_container_access (container_id, identifier)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS property_keys (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    property_id VARCHAR(64) NOT NULL,
-    identifier VARCHAR(128) NOT NULL,
-    granted_by VARCHAR(64) DEFAULT NULL,
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL DEFAULT NULL,
-    UNIQUE KEY uk_property_keys (property_id, identifier),
-    INDEX idx_property_keys_identifier (identifier)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+-- access-manager module (single generic table)
 CREATE TABLE IF NOT EXISTS generic_access (
     id INT AUTO_INCREMENT PRIMARY KEY,
     access_type VARCHAR(32) NOT NULL,
@@ -137,28 +96,15 @@ CREATE TABLE IF NOT EXISTS characters (
     INDEX idx_characters_identifier (identifier)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- money-manager module
-CREATE TABLE IF NOT EXISTS player_money (
-    identifier VARCHAR(128) PRIMARY KEY,
-    cash BIGINT NOT NULL DEFAULT 0,
-    bank BIGINT NOT NULL DEFAULT 0,
-    black_money BIGINT NOT NULL DEFAULT 0,
+-- balances-manager module
+CREATE TABLE IF NOT EXISTS balances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    identifier VARCHAR(128) NOT NULL,
+    balance BIGINT NOT NULL DEFAULT 0,
+    metadata JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS transactions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    from_identifier VARCHAR(128) DEFAULT NULL,
-    to_identifier VARCHAR(128) DEFAULT NULL,
-    type VARCHAR(20) NOT NULL,
-    amount BIGINT NOT NULL DEFAULT 0,
-    transaction_type VARCHAR(20) NOT NULL,
-    reason VARCHAR(255) DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_transactions_from (from_identifier),
-    INDEX idx_transactions_to (to_identifier),
-    INDEX idx_transactions_created_at (created_at)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_balances_identifier (identifier)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- container-manager module

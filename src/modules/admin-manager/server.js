@@ -109,26 +109,6 @@ class AdminManager {
       }
     });
 
-    // Give money command
-    chatCommands.register('givemoney', (source, args) => {
-      if (!this.hasPermission(source, this.permissionLevels.admin)) return;
-
-      const targetSource = parseInt(args[0]);
-      const amount = parseInt(args[1]);
-      const type = args[2] || 'cash';
-
-      if (isNaN(targetSource) || isNaN(amount) || amount <= 0) return;
-
-      // Verify target player exists
-      const pm = this.framework.getModule('player-manager');
-      if (!pm || !pm.get(targetSource)) return;
-
-      const moneyManager = this.framework.getModule('money-manager');
-      if (moneyManager) {
-        moneyManager.addMoney(targetSource, type, amount, 'admin_give');
-      }
-    });
-
     // Noclip command
     chatCommands.register('noclip', (source, args) => {
       if (!this.isAdmin(source)) return;

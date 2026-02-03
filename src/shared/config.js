@@ -37,7 +37,7 @@ const Config = {
     { name: 'container-manager', priority: 14 }, // Inventory system
     { name: 'character-manager', priority: 14 }, // Character management
     { name: 'character-appearance', priority: 14 }, // Character appearance & skins
-    { name: 'money-manager', priority: 15 },    // Money & economy
+    { name: 'balances-manager', priority: 15 },  // Generic account & balance system
     { name: 'organization-manager', priority: 16 }, // Organizations/jobs
     { name: 'vehicle-manager', priority: 17 },  // Vehicle management
     { name: 'spawn-manager', priority: 15 },    // Player spawn system

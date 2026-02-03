@@ -1,636 +1,406 @@
 /**
  * NextGen Framework - Access Manager Module
- * Handles doors, vehicle keys, container access, and generic permissions
+ * Generic access control system — single table `generic_access`
+ *
+ * Schema: generic_access(id, access_type, resource_id, identifier, granted_by, granted_at, metadata)
+ *   access_type  = category of access (vehicle, container, property, door, or any custom type)
+ *   resource_id  = target resource identifier
+ *   identifier   = who has access (player, org, etc.)
+ *   metadata     = JSON (expires_at, locked state, extra data)
+ *
+ * Convention: identifier='_state' stores resource state (e.g. door locked/unlocked)
  */
 
 class AccessManager {
-  constructor(framework) {
-    this.framework = framework;
-    this.db = null;
+    constructor(framework) {
+        this.framework = framework;
+        this.db = null;
 
-    // In-memory access caches for fast lookups
-    this.vehicleKeys = new Map(); // vehicleId => Set(identifiers)
-    this.doorStates = new Map(); // doorId => { locked: boolean, owner: identifier }
-    this.containerAccess = new Map(); // containerId => Set(identifiers)
-    this.propertyKeys = new Map(); // propertyId => Set(identifiers)
-
-    // Generic access permissions
-    this.accessPermissions = new Map(); // `type:id` => Set(identifiers)
-
-    // Configuration
-    this.config = {
-      enableDoors: true,
-      enableVehicles: true,
-      enableContainers: true,
-      enableProperties: true,
-      defaultLockState: true, // Doors locked by default
-      maxKeysPerVehicle: 5,
-      maxKeysPerProperty: 10,
-      keyExpirationDays: 0 // 0 = never expire
-    };
-  }
-
-  /**
-   * Initialize access manager module
-   */
-  async init() {
-    this.db = this.framework.getModule('database');
-
-    // Load all access data from database (skip if DB not available)
-    if (this.db && this.db.isConnected()) {
-      await this.loadVehicleKeys();
-      await this.loadDoorStates();
-      await this.loadContainerAccess();
-      await this.loadPropertyKeys();
-      await this.loadGenericAccess();
-    } else {
-      this.framework.log.warn('Database not available, starting without persistence');
+        // Single unified cache: `type:resourceId` => Map<identifier, metadata>
+        this.access = new Map();
     }
 
-    this.framework.log.info('Access manager module initialized');
-  }
+    /**
+     * Initialize access manager
+     */
+    async init() {
+        this.db = this.framework.getModule('database');
 
-  // ================================
-  // Vehicle Keys Management
-  // ================================
-
-  /**
-   * Load vehicle keys from database
-   */
-  async loadVehicleKeys() {
-    try {
-      const keys = await this.db.query('SELECT vehicle_id, identifier FROM vehicle_keys WHERE expires_at IS NULL OR expires_at > NOW()');
-
-      this.vehicleKeys.clear();
-      for (const key of keys) {
-        if (!this.vehicleKeys.has(key.vehicle_id)) {
-          this.vehicleKeys.set(key.vehicle_id, new Set());
+        if (this.db && this.db.isConnected()) {
+            await this._loadFromDb();
+        } else {
+            this.framework.log.warn('Database not available, starting without persistence');
         }
-        this.vehicleKeys.get(key.vehicle_id).add(key.identifier);
-      }
 
-      this.framework.log.debug(`Loaded ${keys.length} vehicle keys`);
-    } catch (error) {
-      this.framework.log.error(`Failed to load vehicle keys: ${error.message}`);
+        this.framework.log.info(`Access manager initialized (${this._countEntries()} entries loaded)`);
     }
-  }
 
-  /**
-   * Give vehicle key to player
-   */
-  async giveVehicleKey(vehicleId, identifier, grantedBy = 'system', permanent = true) {
-    try {
-      // Check max keys limit
-      const currentKeys = this.vehicleKeys.get(vehicleId);
-      if (currentKeys && currentKeys.size >= this.config.maxKeysPerVehicle) {
-        return { success: false, reason: 'max_keys_reached' };
-      }
+    // ================================
+    // Core CRUD
+    // ================================
 
-      const expiresAt = permanent ? null : new Date(Date.now() + (this.config.keyExpirationDays * 24 * 60 * 60 * 1000));
+    /**
+     * Grant access
+     * @param {string} accessType - Type of access (vehicle, container, property, door, ...)
+     * @param {string} resourceId - Resource identifier
+     * @param {string} identifier - Who gets access
+     * @param {string} [grantedBy='system'] - Who granted the access
+     * @param {Object} [metadata={}] - Extra data (expires_at, etc.)
+     * @returns {Object} { success } or { success: false, reason }
+     */
+    async grantAccess(accessType, resourceId, identifier, grantedBy = 'system', metadata = {}) {
+        try {
+            const metadataJson = JSON.stringify(metadata);
 
-      await this.db.execute(
-        'INSERT INTO vehicle_keys (vehicle_id, identifier, granted_by, granted_at, expires_at) VALUES (?, ?, ?, NOW(), ?)',
-        [vehicleId, identifier, grantedBy, expiresAt]
-      );
+            await this.db.execute(
+                `INSERT INTO generic_access (access_type, resource_id, identifier, granted_by, granted_at, metadata)
+                 VALUES (?, ?, ?, ?, NOW(), ?)
+                 ON DUPLICATE KEY UPDATE metadata = ?, granted_by = ?`,
+                [accessType, resourceId, identifier, grantedBy, metadataJson, metadataJson, grantedBy]
+            );
 
-      // Update cache
-      if (!this.vehicleKeys.has(vehicleId)) {
-        this.vehicleKeys.set(vehicleId, new Set());
-      }
-      this.vehicleKeys.get(vehicleId).add(identifier);
+            this._cacheSet(accessType, resourceId, identifier, metadata);
 
-      this.framework.log.info(`Granted vehicle key: ${vehicleId} to ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return { success: false, reason: 'already_has_key' };
-      }
-      this.framework.log.error(`Failed to give vehicle key: ${error.message}`);
-      return { success: false, reason: 'database_error', error: error.message };
-    }
-  }
-
-  /**
-   * Remove vehicle key from player
-   */
-  async removeVehicleKey(vehicleId, identifier) {
-    try {
-      const result = await this.db.execute(
-        'DELETE FROM vehicle_keys WHERE vehicle_id = ? AND identifier = ?',
-        [vehicleId, identifier]
-      );
-
-      if (result.affectedRows === 0) {
-        return { success: false, reason: 'key_not_found' };
-      }
-
-      // Update cache
-      const keys = this.vehicleKeys.get(vehicleId);
-      if (keys) {
-        keys.delete(identifier);
-        if (keys.size === 0) {
-          this.vehicleKeys.delete(vehicleId);
+            this.framework.log.debug(`Access granted: ${accessType}:${resourceId} to ${identifier}`);
+            return { success: true };
+        } catch (error) {
+            this.framework.log.error(`Failed to grant access: ${error.message}`);
+            return { success: false, reason: 'database_error' };
         }
-      }
-
-      this.framework.log.info(`Removed vehicle key: ${vehicleId} from ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to remove vehicle key: ${error.message}`);
-      return { success: false, reason: 'database_error', error: error.message };
     }
-  }
 
-  /**
-   * Check if player has vehicle key
-   */
-  hasVehicleKey(vehicleId, identifier) {
-    const keys = this.vehicleKeys.get(vehicleId);
-    return keys ? keys.has(identifier) : false;
-  }
+    /**
+     * Revoke access
+     * @param {string} accessType - Type of access
+     * @param {string} resourceId - Resource identifier
+     * @param {string} identifier - Who loses access
+     * @returns {Object}
+     */
+    async revokeAccess(accessType, resourceId, identifier) {
+        try {
+            const result = await this.db.execute(
+                'DELETE FROM generic_access WHERE access_type = ? AND resource_id = ? AND identifier = ?',
+                [accessType, resourceId, identifier]
+            );
 
-  /**
-   * Get all vehicle keys for a player
-   */
-  getPlayerVehicleKeys(identifier) {
-    const playerKeys = [];
-    for (const [vehicleId, keys] of this.vehicleKeys.entries()) {
-      if (keys.has(identifier)) {
-        playerKeys.push(vehicleId);
-      }
+            if (result.affectedRows === 0) {
+                return { success: false, reason: 'access_not_found' };
+            }
+
+            this._cacheDelete(accessType, resourceId, identifier);
+
+            this.framework.log.debug(`Access revoked: ${accessType}:${resourceId} from ${identifier}`);
+            return { success: true };
+        } catch (error) {
+            this.framework.log.error(`Failed to revoke access: ${error.message}`);
+            return { success: false, reason: 'database_error' };
+        }
     }
-    return playerKeys;
-  }
 
-  /**
-   * Get all key holders for a vehicle
-   */
-  getVehicleKeyHolders(vehicleId) {
-    const keys = this.vehicleKeys.get(vehicleId);
-    return keys ? Array.from(keys) : [];
-  }
+    /**
+     * Revoke all access for a resource
+     * @param {string} accessType - Type of access
+     * @param {string} resourceId - Resource identifier
+     * @returns {Object}
+     */
+    async revokeAllAccess(accessType, resourceId) {
+        try {
+            await this.db.execute(
+                'DELETE FROM generic_access WHERE access_type = ? AND resource_id = ?',
+                [accessType, resourceId]
+            );
 
-  // ================================
-  // Door Lock Management
-  // ================================
+            const key = `${accessType}:${resourceId}`;
+            this.access.delete(key);
 
-  /**
-   * Load door states from database
-   */
-  async loadDoorStates() {
-    try {
-      const doors = await this.db.query('SELECT door_id, locked, owner FROM door_states');
+            return { success: true };
+        } catch (error) {
+            this.framework.log.error(`Failed to revoke all access: ${error.message}`);
+            return { success: false, reason: 'database_error' };
+        }
+    }
 
-      this.doorStates.clear();
-      for (const door of doors) {
-        this.doorStates.set(door.door_id, {
-          locked: door.locked === 1,
-          owner: door.owner
+    /**
+     * Check if identifier has access
+     * @param {string} accessType
+     * @param {string} resourceId
+     * @param {string} identifier
+     * @returns {boolean}
+     */
+    hasAccess(accessType, resourceId, identifier) {
+        const key = `${accessType}:${resourceId}`;
+        const entries = this.access.get(key);
+        if (!entries) return false;
+
+        const meta = entries.get(identifier);
+        if (!meta) return false;
+
+        // Check expiration
+        if (meta.expires_at) {
+            if (new Date(meta.expires_at) < new Date()) {
+                entries.delete(identifier);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Get metadata for an access entry
+     * @param {string} accessType
+     * @param {string} resourceId
+     * @param {string} identifier
+     * @returns {Object|null}
+     */
+    getAccessMetadata(accessType, resourceId, identifier) {
+        const key = `${accessType}:${resourceId}`;
+        const entries = this.access.get(key);
+        if (!entries) return null;
+        return entries.get(identifier) || null;
+    }
+
+    /**
+     * Update metadata for an access entry (merge)
+     * @param {string} accessType
+     * @param {string} resourceId
+     * @param {string} identifier
+     * @param {Object} metadata - Key-value pairs to merge
+     * @returns {Object}
+     */
+    async updateMetadata(accessType, resourceId, identifier, metadata) {
+        const existing = this.getAccessMetadata(accessType, resourceId, identifier);
+        if (!existing) return { success: false, reason: 'access_not_found' };
+
+        const merged = { ...existing, ...metadata };
+
+        try {
+            await this.db.execute(
+                'UPDATE generic_access SET metadata = ? WHERE access_type = ? AND resource_id = ? AND identifier = ?',
+                [JSON.stringify(merged), accessType, resourceId, identifier]
+            );
+
+            this._cacheSet(accessType, resourceId, identifier, merged);
+            return { success: true };
+        } catch (error) {
+            this.framework.log.error(`Failed to update metadata: ${error.message}`);
+            return { success: false, reason: 'database_error' };
+        }
+    }
+
+    // ================================
+    // Query
+    // ================================
+
+    /**
+     * Get all identifiers with access to a resource
+     * @param {string} accessType
+     * @param {string} resourceId
+     * @returns {Array<string>}
+     */
+    getAccessHolders(accessType, resourceId) {
+        const key = `${accessType}:${resourceId}`;
+        const entries = this.access.get(key);
+        if (!entries) return [];
+
+        const holders = [];
+        for (const [identifier] of entries) {
+            if (identifier !== '_state') holders.push(identifier);
+        }
+        return holders;
+    }
+
+    /**
+     * Get all resources an identifier has access to (by type)
+     * @param {string} accessType
+     * @param {string} identifier
+     * @returns {Array<string>} resource IDs
+     */
+    getAccessByIdentifier(accessType, identifier) {
+        const resources = [];
+        const prefix = `${accessType}:`;
+
+        for (const [key, entries] of this.access) {
+            if (key.startsWith(prefix) && entries.has(identifier)) {
+                resources.push(key.slice(prefix.length));
+            }
+        }
+
+        return resources;
+    }
+
+    /**
+     * Get all access entries for a player (all types)
+     * @param {string} identifier
+     * @returns {Array<{accessType, resourceId}>}
+     */
+    getPlayerAccess(identifier) {
+        const result = [];
+
+        for (const [key, entries] of this.access) {
+            if (entries.has(identifier)) {
+                const idx = key.indexOf(':');
+                if (idx === -1) continue;
+                result.push({
+                    accessType: key.slice(0, idx),
+                    resourceId: key.slice(idx + 1)
+                });
+            }
+        }
+
+        return result;
+    }
+
+    // ================================
+    // Door Convenience Methods
+    // ================================
+
+    /**
+     * Register a door (stores state in metadata)
+     * @param {string} doorId
+     * @param {string} owner
+     * @param {boolean} [locked=true]
+     */
+    async registerDoor(doorId, owner, locked = true) {
+        return this.grantAccess('door', doorId, '_state', 'system', {
+            locked, owner
         });
-      }
-
-      this.framework.log.debug(`Loaded ${doors.length} door states`);
-    } catch (error) {
-      this.framework.log.error(`Failed to load door states: ${error.message}`);
-    }
-  }
-
-  /**
-   * Register a door
-   */
-  async registerDoor(doorId, owner, locked = true) {
-    try {
-      await this.db.execute(
-        'INSERT INTO door_states (door_id, locked, owner, created_at) VALUES (?, ?, ?, NOW()) ' +
-        'ON DUPLICATE KEY UPDATE locked = ?, owner = ?',
-        [doorId, locked, owner, locked, owner]
-      );
-
-      this.doorStates.set(doorId, { locked, owner });
-
-      this.framework.log.debug(`Registered door: ${doorId}`);
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to register door: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Toggle door lock state
-   */
-  async toggleDoorLock(doorId, identifier) {
-    const doorState = this.doorStates.get(doorId);
-
-    if (!doorState) {
-      return { success: false, reason: 'door_not_found' };
     }
 
-    // Check if player has access
-    if (doorState.owner !== identifier && !await this.hasAccess('door', doorId, identifier)) {
-      return { success: false, reason: 'access_denied' };
-    }
+    /**
+     * Toggle door lock state
+     * @param {string} doorId
+     * @param {string} identifier - Who is toggling
+     */
+    async toggleDoorLock(doorId, identifier) {
+        const state = this.getAccessMetadata('door', doorId, '_state');
+        if (!state) return { success: false, reason: 'door_not_found' };
 
-    const newState = !doorState.locked;
-
-    // Optimistic cache update (prevents race condition on concurrent calls)
-    doorState.locked = newState;
-
-    try {
-      await this.db.execute(
-        'UPDATE door_states SET locked = ?, last_toggled_at = NOW(), last_toggled_by = ? WHERE door_id = ?',
-        [newState, identifier, doorId]
-      );
-
-      this.framework.log.debug(`Door ${doorId} ${newState ? 'locked' : 'unlocked'} by ${identifier}`);
-
-      // Sync to all clients
-      this.framework.fivem.emitNet('ng_core:door-state-changed', -1, doorId, newState);
-
-      return { success: true, locked: newState };
-    } catch (error) {
-      // Rollback cache on DB failure
-      doorState.locked = !newState;
-      this.framework.log.error(`Failed to toggle door: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get door state
-   */
-  getDoorState(doorId) {
-    const state = this.doorStates.get(doorId);
-    if (!state) return { locked: this.config.defaultLockState, owner: null };
-    return { locked: state.locked, owner: state.owner };
-  }
-
-  /**
-   * Check if door is locked
-   */
-  isDoorLocked(doorId) {
-    const state = this.doorStates.get(doorId);
-    return state ? state.locked : this.config.defaultLockState;
-  }
-
-  // ================================
-  // Container Access Management
-  // ================================
-
-  /**
-   * Load container access from database
-   */
-  async loadContainerAccess() {
-    try {
-      const access = await this.db.query('SELECT container_id, identifier FROM container_access');
-
-      this.containerAccess.clear();
-      for (const entry of access) {
-        if (!this.containerAccess.has(entry.container_id)) {
-          this.containerAccess.set(entry.container_id, new Set());
+        // Check access: owner or has door access
+        if (state.owner !== identifier && !this.hasAccess('door', doorId, identifier)) {
+            return { success: false, reason: 'access_denied' };
         }
-        this.containerAccess.get(entry.container_id).add(entry.identifier);
-      }
 
-      this.framework.log.debug(`Loaded ${access.length} container access entries`);
-    } catch (error) {
-      this.framework.log.error(`Failed to load container access: ${error.message}`);
-    }
-  }
+        const newLocked = !state.locked;
 
-  /**
-   * Grant container access to player
-   */
-  async grantContainerAccess(containerId, identifier, grantedBy = 'system') {
-    try {
-      await this.db.execute(
-        'INSERT INTO container_access (container_id, identifier, granted_by, granted_at) VALUES (?, ?, ?, NOW())',
-        [containerId, identifier, grantedBy]
-      );
+        const result = await this.updateMetadata('door', doorId, '_state', {
+            locked: newLocked,
+            last_toggled_at: new Date().toISOString(),
+            last_toggled_by: identifier
+        });
 
-      if (!this.containerAccess.has(containerId)) {
-        this.containerAccess.set(containerId, new Set());
-      }
-      this.containerAccess.get(containerId).add(identifier);
-
-      this.framework.log.info(`Granted container access: ${containerId} to ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return { success: false, reason: 'already_has_access' };
-      }
-      this.framework.log.error(`Failed to grant container access: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Revoke container access from player
-   */
-  async revokeContainerAccess(containerId, identifier) {
-    try {
-      const result = await this.db.execute(
-        'DELETE FROM container_access WHERE container_id = ? AND identifier = ?',
-        [containerId, identifier]
-      );
-
-      if (result.affectedRows === 0) {
-        return { success: false, reason: 'access_not_found' };
-      }
-
-      const access = this.containerAccess.get(containerId);
-      if (access) {
-        access.delete(identifier);
-        if (access.size === 0) {
-          this.containerAccess.delete(containerId);
+        if (result.success) {
+            this.framework.fivem.emitNet('ng_core:door-state-changed', -1, doorId, newLocked);
+            this.framework.log.debug(`Door ${doorId} ${newLocked ? 'locked' : 'unlocked'} by ${identifier}`);
         }
-      }
 
-      this.framework.log.info(`Revoked container access: ${containerId} from ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to revoke container access: ${error.message}`);
-      return { success: false, error: error.message };
+        return { success: result.success, locked: newLocked };
     }
-  }
 
-  /**
-   * Check if player has container access
-   */
-  hasContainerAccess(containerId, identifier) {
-    const access = this.containerAccess.get(containerId);
-    return access ? access.has(identifier) : false;
-  }
+    /**
+     * Get door state
+     * @param {string} doorId
+     * @returns {{ locked: boolean, owner: string|null }}
+     */
+    getDoorState(doorId) {
+        const state = this.getAccessMetadata('door', doorId, '_state');
+        if (!state) return { locked: true, owner: null };
+        return { locked: !!state.locked, owner: state.owner || null };
+    }
 
-  // ================================
-  // Property Keys Management
-  // ================================
+    /**
+     * Check if door is locked
+     * @param {string} doorId
+     * @returns {boolean}
+     */
+    isDoorLocked(doorId) {
+        const state = this.getAccessMetadata('door', doorId, '_state');
+        return state ? !!state.locked : true;
+    }
 
-  /**
-   * Load property keys from database
-   */
-  async loadPropertyKeys() {
-    try {
-      const keys = await this.db.query('SELECT property_id, identifier FROM property_keys WHERE expires_at IS NULL OR expires_at > NOW()');
+    // ================================
+    // Internal
+    // ================================
 
-      this.propertyKeys.clear();
-      for (const key of keys) {
-        if (!this.propertyKeys.has(key.property_id)) {
-          this.propertyKeys.set(key.property_id, new Set());
+    /**
+     * Load all access from database
+     */
+    async _loadFromDb() {
+        try {
+            const rows = await this.db.query(
+                'SELECT access_type, resource_id, identifier, metadata FROM generic_access'
+            );
+
+            this.access.clear();
+            for (const row of rows) {
+                const meta = this._parseJson(row.metadata);
+                this._cacheSet(row.access_type, row.resource_id, row.identifier, meta);
+            }
+
+            this.framework.log.debug(`Loaded ${rows.length} access entries`);
+        } catch (error) {
+            this.framework.log.error(`Failed to load access data: ${error.message}`);
         }
-        this.propertyKeys.get(key.property_id).add(key.identifier);
-      }
-
-      this.framework.log.debug(`Loaded ${keys.length} property keys`);
-    } catch (error) {
-      this.framework.log.error(`Failed to load property keys: ${error.message}`);
     }
-  }
 
-  /**
-   * Give property key to player
-   */
-  async givePropertyKey(propertyId, identifier, grantedBy = 'system', permanent = true) {
-    try {
-      // Check max keys limit
-      const currentKeys = this.propertyKeys.get(propertyId);
-      if (currentKeys && currentKeys.size >= this.config.maxKeysPerProperty) {
-        return { success: false, reason: 'max_keys_reached' };
-      }
-
-      const expiresAt = permanent ? null : new Date(Date.now() + (this.config.keyExpirationDays * 24 * 60 * 60 * 1000));
-
-      await this.db.execute(
-        'INSERT INTO property_keys (property_id, identifier, granted_by, granted_at, expires_at) VALUES (?, ?, ?, NOW(), ?)',
-        [propertyId, identifier, grantedBy, expiresAt]
-      );
-
-      if (!this.propertyKeys.has(propertyId)) {
-        this.propertyKeys.set(propertyId, new Set());
-      }
-      this.propertyKeys.get(propertyId).add(identifier);
-
-      this.framework.log.info(`Granted property key: ${propertyId} to ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return { success: false, reason: 'already_has_key' };
-      }
-      this.framework.log.error(`Failed to give property key: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Remove property key from player
-   */
-  async removePropertyKey(propertyId, identifier) {
-    try {
-      const result = await this.db.execute(
-        'DELETE FROM property_keys WHERE property_id = ? AND identifier = ?',
-        [propertyId, identifier]
-      );
-
-      if (result.affectedRows === 0) {
-        return { success: false, reason: 'key_not_found' };
-      }
-
-      const keys = this.propertyKeys.get(propertyId);
-      if (keys) {
-        keys.delete(identifier);
-        if (keys.size === 0) {
-          this.propertyKeys.delete(propertyId);
+    _cacheSet(accessType, resourceId, identifier, metadata) {
+        const key = `${accessType}:${resourceId}`;
+        if (!this.access.has(key)) {
+            this.access.set(key, new Map());
         }
-      }
-
-      this.framework.log.info(`Removed property key: ${propertyId} from ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to remove property key: ${error.message}`);
-      return { success: false, error: error.message };
+        this.access.get(key).set(identifier, metadata || {});
     }
-  }
 
-  /**
-   * Check if player has property key
-   */
-  hasPropertyKey(propertyId, identifier) {
-    const keys = this.propertyKeys.get(propertyId);
-    return keys ? keys.has(identifier) : false;
-  }
-
-  // ================================
-  // Generic Access Management
-  // ================================
-
-  /**
-   * Load generic access permissions from database
-   */
-  async loadGenericAccess() {
-    try {
-      const access = await this.db.query('SELECT access_type, resource_id, identifier, metadata FROM generic_access');
-
-      this.accessPermissions.clear();
-      for (const entry of access) {
-        const key = `${entry.access_type}:${entry.resource_id}`;
-        if (!this.accessPermissions.has(key)) {
-          this.accessPermissions.set(key, new Set());
+    _cacheDelete(accessType, resourceId, identifier) {
+        const key = `${accessType}:${resourceId}`;
+        const entries = this.access.get(key);
+        if (entries) {
+            entries.delete(identifier);
+            if (entries.size === 0) this.access.delete(key);
         }
-        this.accessPermissions.get(key).add(entry.identifier);
-      }
-
-      this.framework.log.debug(`Loaded ${access.length} generic access entries`);
-    } catch (error) {
-      this.framework.log.error(`Failed to load generic access: ${error.message}`);
     }
-  }
 
-  /**
-   * Grant generic access permission
-   */
-  async grantAccess(accessType, resourceId, identifier, grantedBy = 'system', metadata = {}) {
-    try {
-      let metadataJson = '{}';
-      try { metadataJson = JSON.stringify(metadata); } catch (e) { /* circular or invalid */ }
-
-      await this.db.execute(
-        'INSERT INTO generic_access (access_type, resource_id, identifier, granted_by, granted_at, metadata) VALUES (?, ?, ?, ?, NOW(), ?)',
-        [accessType, resourceId, identifier, grantedBy, metadataJson]
-      );
-
-      const key = `${accessType}:${resourceId}`;
-      if (!this.accessPermissions.has(key)) {
-        this.accessPermissions.set(key, new Set());
-      }
-      this.accessPermissions.get(key).add(identifier);
-
-      this.framework.log.info(`Granted access: ${accessType}:${resourceId} to ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return { success: false, reason: 'already_has_access' };
-      }
-      this.framework.log.error(`Failed to grant access: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Revoke generic access permission
-   */
-  async revokeAccess(accessType, resourceId, identifier) {
-    try {
-      const result = await this.db.execute(
-        'DELETE FROM generic_access WHERE access_type = ? AND resource_id = ? AND identifier = ?',
-        [accessType, resourceId, identifier]
-      );
-
-      if (result.affectedRows === 0) {
-        return { success: false, reason: 'access_not_found' };
-      }
-
-      const key = `${accessType}:${resourceId}`;
-      const access = this.accessPermissions.get(key);
-      if (access) {
-        access.delete(identifier);
-        if (access.size === 0) {
-          this.accessPermissions.delete(key);
+    _countEntries() {
+        let count = 0;
+        for (const entries of this.access.values()) {
+            count += entries.size;
         }
-      }
-
-      this.framework.log.info(`Revoked access: ${accessType}:${resourceId} from ${identifier}`);
-
-      return { success: true };
-    } catch (error) {
-      this.framework.log.error(`Failed to revoke access: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Check if player has generic access
-   */
-  hasAccess(accessType, resourceId, identifier) {
-    const key = `${accessType}:${resourceId}`;
-    const access = this.accessPermissions.get(key);
-    return access ? access.has(identifier) : false;
-  }
-
-  /**
-   * Get all access entries for a player
-   */
-  getPlayerAccess(identifier) {
-    const playerAccess = [];
-
-    for (const [key, identifiers] of this.accessPermissions.entries()) {
-      if (identifiers.has(identifier)) {
-        const idx = key.indexOf(':');
-        if (idx === -1) continue;
-        const accessType = key.slice(0, idx);
-        const resourceId = key.slice(idx + 1);
-        playerAccess.push({ accessType, resourceId });
-      }
+        return count;
     }
 
-    return playerAccess;
-  }
+    _parseJson(value) {
+        if (!value) return {};
+        return typeof value === 'string' ? JSON.parse(value) : value;
+    }
 
-  // ================================
-  // Utility Methods
-  // ================================
+    /**
+     * Reload all data
+     */
+    async reload() {
+        await this._loadFromDb();
+        this.framework.log.info('Access manager data reloaded');
+    }
 
-  /**
-   * Configure access manager
-   */
-  configure(config) {
-    this.config = { ...this.config, ...config };
-    this.framework.log.info('Access manager configuration updated');
-  }
+    /**
+     * Get statistics
+     */
+    getStats() {
+        const stats = {};
+        for (const [key, entries] of this.access) {
+            const type = key.split(':')[0];
+            stats[type] = (stats[type] || 0) + entries.size;
+        }
+        stats.total = this._countEntries();
+        return stats;
+    }
 
-  /**
-   * Reload all access data
-   */
-  async reload() {
-    await this.loadVehicleKeys();
-    await this.loadDoorStates();
-    await this.loadContainerAccess();
-    await this.loadPropertyKeys();
-    await this.loadGenericAccess();
-    this.framework.log.info('Access manager data reloaded');
-  }
-
-  /**
-   * Get access statistics
-   */
-  getStats() {
-    return {
-      vehicleKeys: this.vehicleKeys.size,
-      doors: this.doorStates.size,
-      containers: this.containerAccess.size,
-      properties: this.propertyKeys.size,
-      genericAccess: this.accessPermissions.size
-    };
-  }
-
-
-  /**
-   * Cleanup
-   */
-  async destroy() {
-    this.vehicleKeys.clear();
-    this.doorStates.clear();
-    this.containerAccess.clear();
-    this.propertyKeys.clear();
-    this.accessPermissions.clear();
-    this.framework.log.info('Access manager module destroyed');
-  }
+    /**
+     * Cleanup
+     */
+    async destroy() {
+        this.access.clear();
+        this.framework.log.info('Access manager destroyed');
+    }
 }
 
 module.exports = AccessManager;
