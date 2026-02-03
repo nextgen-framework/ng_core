@@ -41,6 +41,11 @@ client_scripts {
     'src/client/exports.js'
 }
 
+-- Files streamed to client (for cross-resource @ng_core/ references)
+files {
+    'src/bridge.js'
+}
+
 server_exports {
     'GetFramework',
     'IsReady',

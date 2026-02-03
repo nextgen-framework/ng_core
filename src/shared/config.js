@@ -73,10 +73,7 @@ const Config = {
   }
 };
 
-// Export config
-if (typeof exports !== 'undefined') {
-  exports('GetConfig', () => Config);
-}
+// Available via global.NGCore.Config / Framework.config
 
 // Make available globally
 global.NGCore = global.NGCore || {};

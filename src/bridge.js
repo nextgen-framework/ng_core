@@ -1,28 +1,47 @@
 /**
  * NextGen Kernel - Bridge
  *
- * Include via @ng_core/bridge.js in plugin fxmanifest (shared_scripts).
- * Shares ng_core's context — global.Framework is directly available.
+ * Include via @ng_core/src/bridge.js in plugin fxmanifest (shared_scripts).
+ * Runs in the plugin's isolated context. Uses exports for cross-resource access.
  * Safe to include multiple times (idempotent).
  *
  * Provides:
- *   - global.Framework                        : kernel instance (direct access)
- *   - global.Bridge.ready()                   : wait for kernel to be ready
- *   - global.Bridge.expose(target, mappings)  : register FiveM exports for this resource
- *   - global.Bridge.use(resource)             : proxy to another resource's exports
- *   - global.Bridge.module(resource, name)    : proxy to a resource's module methods
- *   - global.Bridge.plugin(resource, name)    : proxy to a resource's plugin methods
+ *   - global.Framework                          : kernel data (via export, serialized)
+ *   - global.ng_core.ready()                    : wait for kernel to be ready
+ *   - global.ng_core.<ExportName>(...)          : direct call to kernel exports (auto-proxy)
+ *   - global.ng_core.expose(target, mappings)   : register FiveM exports for this resource
+ *   - global.ng_core.use(resource)              : proxy to another resource's exports
+ *   - global.ng_core.module(resource, name)     : proxy to a resource's module methods
+ *   - global.ng_core.plugin(resource, name)     : proxy to a resource's plugin methods
  */
 
-if (!global.Bridge) {
-    const _kernelResource = GetConvar('ng_kernel_resource', 'ng_core');
-    const _resourceName = GetCurrentResourceName();
-    const _tag = `[Bridge:${_resourceName}]`;
+const _kernelResource = GetConvar('ng_kernel_resource', 'ng_core');
 
-    // Proxy cache (avoids creating a new Proxy on every call)
+if (!global[_kernelResource]) {
+    const _resourceName = GetCurrentResourceName();
+    const _tag = `[${_kernelResource}:${_resourceName}]`;
+    let _fw = null;
+
+    // Proxy cache
     const _cache = new Map();
 
-    global.Bridge = {
+    // Framework getter via exports (cross-resource, serialized)
+    Object.defineProperty(global, 'Framework', {
+        get() {
+            if (!_fw) {
+                try {
+                    _fw = exports[_kernelResource].GetFramework();
+                } catch (e) {
+                    // Kernel not available yet
+                }
+            }
+            return _fw;
+        },
+        configurable: true
+    });
+
+    // Bridge methods (priority over export proxy)
+    const _bridge = {
         /**
          * Wait for kernel framework to be ready
          * @returns {Promise<Object>} Framework instance
@@ -30,22 +49,30 @@ if (!global.Bridge) {
         ready() {
             return new Promise((resolve, reject) => {
                 // Fast path: already ready
-                const fw = global.Framework;
-                if (fw && typeof fw.isReady === 'function' && fw.isReady()) {
-                    resolve(fw);
-                    return;
-                }
-
-                // Poll direct global.Framework access
-                let attempts = 0;
-                const check = () => {
-                    const fw = global.Framework;
-                    if (fw && typeof fw.isReady === 'function' && fw.isReady()) {
-                        resolve(fw);
+                try {
+                    if (exports[_kernelResource].IsReady()) {
+                        _fw = exports[_kernelResource].GetFramework();
+                        resolve(_fw);
                         return;
                     }
+                } catch (e) {
+                    // Kernel not available yet
+                }
+
+                // Poll via exports
+                let attempts = 0;
+                const check = () => {
+                    try {
+                        if (exports[_kernelResource].IsReady()) {
+                            _fw = exports[_kernelResource].GetFramework();
+                            resolve(_fw);
+                            return;
+                        }
+                    } catch (e) {
+                        // Kernel not available yet
+                    }
                     if (++attempts > 100) {
-                        const err = new Error(`${_tag} Kernel not ready after 10s`);
+                        const err = new Error(`${_tag} Kernel (${_kernelResource}) not ready after 10s`);
                         console.error(err.message);
                         reject(err);
                         return;
@@ -81,7 +108,7 @@ if (!global.Bridge) {
         /**
          * Proxy to another resource's FiveM exports
          * @param {string} resourceName - Resource to connect to
-         * @returns {Proxy} Callable proxy: Bridge.use('ng_economy').GetBalance(src)
+         * @returns {Proxy} Callable proxy: ng_core.use('ng_economy').GetBalance(src)
          */
         use(resourceName) {
             const key = `use:${resourceName}`;
@@ -97,10 +124,9 @@ if (!global.Bridge) {
 
         /**
          * Proxy to a resource's module methods via CallModule export
-         * Method runs in the target resource's context (no serialization)
-         * @param {string} resourceName - Target resource (e.g. 'ng_core', 'ng_economy')
-         * @param {string} moduleName - Module name (e.g. 'chat-commands', 'wallet')
-         * @returns {Proxy} Bridge.module('ng_core', 'chat-commands').register(...)
+         * @param {string} resourceName - Target resource
+         * @param {string} moduleName - Module name
+         * @returns {Proxy} ng_core.module('ng_core', 'chat-commands').register(...)
          */
         module(resourceName, moduleName) {
             const key = `mod:${resourceName}:${moduleName}`;
@@ -116,10 +142,9 @@ if (!global.Bridge) {
 
         /**
          * Proxy to a resource's plugin methods via CallPlugin export
-         * Method runs in the target resource's context (no serialization)
-         * @param {string} resourceName - Target resource (e.g. 'ng_core')
-         * @param {string} pluginName - Plugin name (e.g. 'ng_freemode')
-         * @returns {Proxy} Bridge.plugin('ng_core', 'ng_freemode').spawnPlayer(src)
+         * @param {string} resourceName - Target resource
+         * @param {string} pluginName - Plugin name
+         * @returns {Proxy} ng_core.plugin('ng_core', 'ng_freemode').spawnPlayer(src)
          */
         plugin(resourceName, pluginName) {
             const key = `plg:${resourceName}:${pluginName}`;
@@ -133,4 +158,16 @@ if (!global.Bridge) {
             return _cache.get(key);
         }
     };
+
+    // Proxy: bridge methods first, then fall through to kernel exports
+    // ng_core.ready()          → bridge method
+    // ng_core.RegisterRPC(...) → exports.ng_core.RegisterRPC(...)
+    global[_kernelResource] = new Proxy(_bridge, {
+        get(target, prop) {
+            if (prop in target) return target[prop];
+            return (...args) => exports[_kernelResource][prop](...args);
+        }
+    });
+
+    console.log(`${_tag} Bridge ready`);
 }

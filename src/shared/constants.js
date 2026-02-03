@@ -66,10 +66,7 @@ const Constants = {
   }
 };
 
-// Export constants
-if (typeof exports !== 'undefined') {
-  exports('GetConstants', () => Constants);
-}
+// Available via global.NGCore.Constants / global.NextGenConstants / Framework.constants
 
 // Make available globally
 global.NGCore = global.NGCore || {};

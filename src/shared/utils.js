@@ -112,18 +112,7 @@ function Log(message, level = 'info', metadata = undefined) {
     }
 }
 
-// Export utilities
-if (typeof exports !== 'undefined') {
-    exports('IsServer', IsServer);
-    exports('IsClient', IsClient);
-    exports('SafeJsonParse', SafeJsonParse);
-    exports('DeepClone', DeepClone);
-    exports('GenerateId', GenerateId);
-    exports('Delay', Delay);
-    exports('Debounce', Debounce);
-    exports('Throttle', Throttle);
-    exports('Log', Log);
-}
+// Available via global.NGCore.Utils / global.NextGenUtils / Framework.utils
 
 // Make available globally
 global.NGCore = global.NGCore || {};
