@@ -222,4 +222,4 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 // Self-register
-global.Framework.register('character-appearance', new CharacterAppearanceClient(global.Framework), 15);
+global.Framework.register('character-appearance', new CharacterAppearanceClient(global.Framework), 14);

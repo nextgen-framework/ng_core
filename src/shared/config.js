@@ -50,7 +50,7 @@ const Config = {
   // Module loading configuration (Client-Side)
   ClientModules: [
     { name: 'resource-monitor', priority: 0 },
-    { name: 'plugin-manager', priority: 1 },
+    { name: 'plugin-manager', priority: 2 },
     { name: 'cache', priority: 2 },             // Native value caching (early load)
     { name: 'tick-manager', priority: 3 },      // Tick management with cleanup
     { name: 'rpc', priority: 5 },
@@ -62,7 +62,7 @@ const Config = {
     { name: 'blip-manager', priority: 14 },    // Map blips (client)
     { name: 'text-3d', priority: 14 },         // 3D text renderer (client)
     { name: 'spawn-manager', priority: 15 },    // Spawn management (client)
-    { name: 'character-appearance', priority: 15 }, // Character appearance (client)
+    { name: 'character-appearance', priority: 14 }, // Character appearance (client)
     { name: 'progress', priority: 15 },         // Progress bars (client)
     { name: 'menu', priority: 15 },             // Native menus (client)
     { name: 'hud', priority: 15 },              // HUD framework (client)

@@ -304,4 +304,4 @@ if (typeof module !== 'undefined' && module.exports) {
 global.NgModule_plugin_manager = PluginManager;
 
 // Self-register
-global.Framework.register('plugin-manager', new PluginManager(global.Framework), 1);
+global.Framework.register('plugin-manager', new PluginManager(global.Framework), 2);
