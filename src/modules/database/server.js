@@ -272,42 +272,6 @@ class Database {
   }
 
   /**
-   * Execute a database transaction
-   * @param {Function} callback - async function(connection) that performs queries
-   * @returns {Promise<*>} Result of the callback
-   */
-  async transaction(callback) {
-    if (!this.connected) {
-      throw new Error('Database not connected');
-    }
-
-    try {
-      return await this.mysql.transaction(callback);
-    } catch (error) {
-      this.framework.log.error(`Database transaction error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Prepare a SQL statement
-   * @param {string} sql - SQL statement with ? placeholders
-   * @returns {Promise<Object>} Prepared statement
-   */
-  async prepare(sql) {
-    if (!this.connected) {
-      throw new Error('Database not connected');
-    }
-
-    try {
-      return await this.mysql.prepare(sql);
-    } catch (error) {
-      this.framework.log.error(`Database prepare error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
    * Get or create a Collection abstraction
    * Collections provide a MongoDB-like API over MySQL tables
    *
