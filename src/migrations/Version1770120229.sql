@@ -1,11 +1,24 @@
 -- NextGen Framework - Core module tables
--- admins, characters, balances, persistent_entities,
--- whitelist, queue_settings, containers, container_items,
+-- admins, characters, balances, persistent_entities, server_logs,
+-- whitelist, queue_settings, containers, container_items, world_state,
 -- vehicles, organizations, organization_employees, generic_access
 
 -- ================================
 -- Layer 0-2 : Foundation / Infrastructure
 -- ================================
+
+-- logger module
+CREATE TABLE IF NOT EXISTS server_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    level VARCHAR(10) NOT NULL,
+    message TEXT NOT NULL,
+    resource VARCHAR(64) DEFAULT NULL,
+    metadata JSON DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_server_logs_level (level),
+    INDEX idx_server_logs_resource (resource),
+    INDEX idx_server_logs_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- persistence module
 CREATE TABLE IF NOT EXISTS persistent_entities (
@@ -67,6 +80,19 @@ CREATE TABLE IF NOT EXISTS admins (
     UNIQUE KEY uk_admins_identifier (identifier),
     INDEX idx_admins_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- sync-manager module
+CREATE TABLE IF NOT EXISTS world_state (
+    id INT PRIMARY KEY DEFAULT 1,
+    time_hour TINYINT UNSIGNED NOT NULL DEFAULT 12,
+    time_minute TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    weather VARCHAR(20) NOT NULL DEFAULT 'CLEAR',
+    blackout TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_single_row CHECK (id = 1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO world_state (id) VALUES (1);
 
 -- access-manager module (single generic table)
 CREATE TABLE IF NOT EXISTS generic_access (

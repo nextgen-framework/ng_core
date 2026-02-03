@@ -15,7 +15,7 @@ const Config = {
   // Lower priority number = loads first (0 = highest priority)
   Modules: [
     { name: 'database', priority: 0 },          // Load FIRST - Layer 0 Foundation
-    // Logger removed: migrated to kernel utils.Log() (levels, colors, DB, discord)
+    { name: 'logger', priority: 1 },            // Persistent logging (DB + Discord webhooks)
     { name: 'resource-monitor', priority: 1 },  // Monitor all resources
     { name: 'plugin-manager', priority: 2 },    // Manage plugins
     { name: 'persistence', priority: 3 },       // Persistence manager (after database)
@@ -33,6 +33,8 @@ const Config = {
     { name: 'session-manager', priority: 12 },  // Session management (races, missions)
     { name: 'zone-manager', priority: 12 },     // Zone management system
     { name: 'target', priority: 13 },           // Target system (raycast interactions)
+    { name: 'blip-manager', priority: 14 },    // Map blips (in-memory)
+    { name: 'text-3d', priority: 14 },         // 3D text points (in-memory)
     // Note: item-registry is shared-only (no server.js)
     { name: 'container-manager', priority: 14 }, // Inventory system
     { name: 'character-manager', priority: 14 }, // Character management
@@ -57,8 +59,13 @@ const Config = {
     { name: 'session-manager', priority: 12 },  // Session management (client)
     { name: 'zone-manager', priority: 12 },     // Zone management system (client)
     { name: 'target', priority: 13 },           // Target system (client)
+    { name: 'blip-manager', priority: 14 },    // Map blips (client)
+    { name: 'text-3d', priority: 14 },         // 3D text renderer (client)
     { name: 'spawn-manager', priority: 15 },    // Spawn management (client)
     { name: 'character-appearance', priority: 15 }, // Character appearance (client)
+    { name: 'progress', priority: 15 },         // Progress bars (client)
+    { name: 'menu', priority: 15 },             // Native menus (client)
+    { name: 'hud', priority: 15 },              // HUD framework (client)
     { name: 'notifications', priority: 15 },    // Notification system
     { name: 'performance', priority: 20 }       // Performance monitoring
   ],
