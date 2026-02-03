@@ -118,7 +118,14 @@ class SpawnManagerClient {
 
     this.hasSpawned = true;
 
+    // Shut down FiveM loading screen
+    ShutdownLoadingScreen();
+    ShutdownLoadingScreenNui();
+
     console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
+
+    // Trigger FiveM playerSpawned event (connection-manager listens for this)
+    emit('playerSpawned');
 
     // Trigger event for other modules
     this.framework.fivem.emit('ng_core:player-spawned', coords);

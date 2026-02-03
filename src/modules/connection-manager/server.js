@@ -129,7 +129,7 @@ class ConnectionManager {
    */
   updateStageProgress(source, progress, stage, message) {
     try {
-      this.framework.fivem.emitNet('ng:loading:updateStageProgress', source, progress, stage, message);
+      this.framework.fivem.emitNet('ng:loading:updateProgress', source, progress, stage, message);
     } catch (error) {
       // Silently fail if player disconnected
     }

@@ -11,6 +11,7 @@ setTimeout(() => {
   if (!hasShutdown) {
     console.log('[Loading Screen] Failsafe timeout reached, forcing shutdown');
     hasShutdown = true;
+    ShutdownLoadingScreen();
     ShutdownLoadingScreenNui();
   }
 }, 60000); // 60 seconds
@@ -35,7 +36,8 @@ global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, mess
     if (!hasShutdown) {
       hasShutdown = true;
       console.log('[Loading Screen] Shutting down loading screen');
-      ShutdownLoadingScreenNui();
+      ShutdownLoadingScreen();
+    ShutdownLoadingScreenNui();
     }
   }
 });
@@ -45,6 +47,7 @@ on('playerSpawned', () => {
   if (!hasShutdown) {
     hasShutdown = true;
     console.log('[Loading Screen] Player spawned (fallback), shutting down loading screen');
+    ShutdownLoadingScreen();
     ShutdownLoadingScreenNui();
   }
 });
