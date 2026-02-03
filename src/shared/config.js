@@ -24,10 +24,10 @@ const Config = {
     { name: 'connection-manager', priority: 8 }, // Connection stages manager (before queue)
     { name: 'queue', priority: 9 },             // Queue (after whitelist, before player-manager)
     { name: 'hardcap', priority: 10 },          // Enforce player limit (after queue, works with queue module)
+    { name: 'player-manager', priority: 10 },   // Player lifecycle
+    { name: 'entity-manager', priority: 10 },   // Entity management
     { name: 'access-manager', priority: 11 },   // Access control (keys, doors, locks)
     { name: 'admin-manager', priority: 11 },    // Admin tools
-    { name: 'player-manager', priority: 10 },
-    { name: 'entity-manager', priority: 10 },
     { name: 'sync-manager', priority: 11 },     // World state sync (weather, time)
     { name: 'instance-manager', priority: 12 }, // Instance isolation (routing buckets)
     { name: 'session-manager', priority: 12 },  // Session management (races, missions)
@@ -40,10 +40,10 @@ const Config = {
     { name: 'character-manager', priority: 14 }, // Character management
     { name: 'character-appearance', priority: 14 }, // Character appearance & skins
     { name: 'balances-manager', priority: 15 },  // Generic account & balance system
-    { name: 'organization-manager', priority: 16 }, // Organizations/jobs
-    { name: 'vehicle-manager', priority: 17 },  // Vehicle management
     { name: 'spawn-manager', priority: 15 },    // Player spawn system
     { name: 'chat-commands', priority: 15 },    // Chat command system
+    { name: 'organization-manager', priority: 16 }, // Organizations/jobs
+    { name: 'vehicle-manager', priority: 17 },  // Vehicle management
     { name: 'performance', priority: 20 }       // Performance monitoring
   ],
 
@@ -61,8 +61,8 @@ const Config = {
     { name: 'target', priority: 13 },           // Target system (client)
     { name: 'blip-manager', priority: 14 },    // Map blips (client)
     { name: 'text-3d', priority: 14 },         // 3D text renderer (client)
-    { name: 'spawn-manager', priority: 15 },    // Spawn management (client)
     { name: 'character-appearance', priority: 14 }, // Character appearance (client)
+    { name: 'spawn-manager', priority: 15 },    // Spawn management (client)
     { name: 'progress', priority: 15 },         // Progress bars (client)
     { name: 'menu', priority: 15 },             // Native menus (client)
     { name: 'hud', priority: 15 },              // HUD framework (client)

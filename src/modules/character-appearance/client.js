@@ -74,7 +74,7 @@ class CharacterAppearanceClient {
       this.framework.fivem.emitNet('ng_core:client-ready');
 
     } catch (error) {
-      console.error('[Character Appearance] Error applying appearance:', error);
+      this.framework.log.error(`[Character Appearance] Error applying appearance: ${error.message}`);
     } finally {
       this.isApplying = false;
     }
@@ -99,7 +99,7 @@ class CharacterAppearanceClient {
     }
 
     if (!HasModelLoaded(modelHash)) {
-      console.error(`[Character Appearance] Failed to load model: ${modelName}`);
+      this.framework.log.error(`[Character Appearance] Failed to load model: ${modelName}`);
       return;
     }
 

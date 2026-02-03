@@ -283,7 +283,7 @@ class TickManager {
       try {
         callback();
       } catch (error) {
-        console.error(`[TickManager] Error in tick "${name}":`, error.message);
+        this.framework.log.error(`[TickManager] Error in tick "${name}": ${error.message}`);
       }
     });
   }
