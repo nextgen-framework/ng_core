@@ -23,6 +23,23 @@ fw.expose('plugin-manager', {
     'GetPluginState': { method: 'getState', fallback: 'UNLOADED' },
 });
 
+// Blip management
+fw.expose('blip-manager', {
+    'CreateBlip': 'createBlip',
+    'CreateRuntimeBlip': 'createRuntimeBlip',
+    'CreateTempBlip': 'createTempBlip',
+    'RemoveBlip': 'removeBlip',
+    'UpdateBlip': 'updateBlip',
+});
+
+// 3D Text management
+fw.expose('text-3d', {
+    'CreateText3D': 'createPoint',
+    'CreateRuntimeText3D': 'createRuntimePoint',
+    'RemoveText3D': 'removePoint',
+    'UpdateText3D': 'updatePoint',
+});
+
 // Queue management
 fw.expose('queue', {
     'Queue_RegisterType': 'registerQueueType',

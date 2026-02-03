@@ -65,7 +65,16 @@ server_exports {
     'Queue_SetDynamicType',
     'Queue_RemoveDynamic',
     'CallModule',
-    'CallPlugin'
+    'CallPlugin',
+    'CreateBlip',
+    'CreateRuntimeBlip',
+    'CreateTempBlip',
+    'RemoveBlip',
+    'UpdateBlip',
+    'CreateText3D',
+    'CreateRuntimeText3D',
+    'RemoveText3D',
+    'UpdateText3D'
 }
 
 client_exports {
@@ -83,5 +92,15 @@ client_exports {
     'NotifySuccess',
     'NotifyInfo',
     'NotifyWarning',
-    'NotifyError'
+    'NotifyError',
+    'StartProgress',
+    'CancelProgress',
+    'IsProgressActive',
+    'OpenMenu',
+    'CloseMenu',
+    'IsMenuOpen',
+    'ShowHud',
+    'HideHud',
+    'RegisterHudComponent',
+    'UpdateHudComponent'
 }

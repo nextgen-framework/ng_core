@@ -28,3 +28,25 @@ fw.expose('notifications', {
     'NotifyWarning': { method: 'warning', fallback: null },
     'NotifyError': { method: 'error', fallback: null },
 });
+
+// Progress
+fw.expose('progress', {
+    'StartProgress': 'start',
+    'CancelProgress': 'cancel',
+    'IsProgressActive': { method: 'isActive', fallback: false },
+});
+
+// Menu
+fw.expose('menu', {
+    'OpenMenu': 'open',
+    'CloseMenu': 'closeAll',
+    'IsMenuOpen': { method: 'isOpen', fallback: false },
+});
+
+// HUD
+fw.expose('hud', {
+    'ShowHud': 'showAll',
+    'HideHud': 'hideAll',
+    'RegisterHudComponent': 'registerComponent',
+    'UpdateHudComponent': 'updateComponent',
+});
