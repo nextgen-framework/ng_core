@@ -12,7 +12,7 @@ class HardcapModule {
     // Get max clients from convar
     this.maxClients = GetConvarInt('sv_maxclients', 32);
 
-    console.log(`[NextGen] [Hardcap] Module initialized - Max players: ${this.maxClients}`);
+    this.framework.log.info(`[Hardcap] Module initialized - Max players: ${this.maxClients}`);
   }
 
   /**
@@ -31,7 +31,7 @@ class HardcapModule {
 
       // Check if server is at or over the limit
       if (this.playerCount >= this.maxClients) {
-        console.log(`[NextGen] [Hardcap] Server full (${this.playerCount}/${this.maxClients}) - Player ${name} will be queued`);
+        this.framework.log.info(`[Hardcap] Server full (${this.playerCount}/${this.maxClients}) - Player ${name} will be queued`);
 
         // Get queue module and add player to queue
         const queueModule = this.framework.getModule('queue');
@@ -41,14 +41,14 @@ class HardcapModule {
           return;
         } else {
           // No queue module available, reject connection
-          console.log(`[NextGen] [Hardcap] No queue module - Denied connection from ${name}`);
+          this.framework.log.warn(`[Hardcap] No queue module - Denied connection from ${name}`);
           setKickReason(`This server is full (${this.maxClients}/${this.maxClients} players online). No queue available.`);
           CancelEvent();
           return;
         }
       }
 
-      console.log(`[NextGen] [Hardcap] Player connecting: ${name} (${this.playerCount + 1}/${this.maxClients})`);
+      this.framework.log.info(`[Hardcap] Player connecting: ${name} (${this.playerCount + 1}/${this.maxClients})`);
     });
 
     // Handle player activation (when fully loaded)
@@ -58,7 +58,7 @@ class HardcapModule {
       if (!this.activePlayers.has(src)) {
         this.playerCount++;
         this.activePlayers.set(src, true);
-        console.log(`[NextGen] [Hardcap] Player activated - Total: ${this.playerCount}/${this.maxClients}`);
+        this.framework.log.info(`[Hardcap] Player activated - Total: ${this.playerCount}/${this.maxClients}`);
       }
     });
 
@@ -68,7 +68,7 @@ class HardcapModule {
       if (this.activePlayers.has(src)) {
         this.playerCount--;
         this.activePlayers.delete(src);
-        console.log(`[NextGen] [Hardcap] Player dropped - Total: ${this.playerCount}/${this.maxClients}`);
+        this.framework.log.info(`[Hardcap] Player dropped - Total: ${this.playerCount}/${this.maxClients}`);
       }
     });
   }

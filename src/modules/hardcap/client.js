@@ -10,7 +10,7 @@ setImmediate(() => {
       // Session started, notify server
       global.Framework.fivem.emitNet('hardcap:playerActivated');
       clearInterval(checkSessionStarted);
-      console.log('[NextGen] [Hardcap] Player session activated');
+      global.Framework.log.debug('[Hardcap] Player session activated');
     }
   }, 100);
 });

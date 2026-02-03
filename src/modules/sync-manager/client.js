@@ -32,7 +32,7 @@ class SyncManagerClient {
         // Request full sync from server (client is ready)
         this.framework.emitNet('ng_core:request-sync');
 
-        console.log('[SyncManager] Client initialized');
+        this.framework.log.debug('[SyncManager] Client initialized');
     }
 
     /**

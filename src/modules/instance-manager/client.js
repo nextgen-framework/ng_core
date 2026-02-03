@@ -22,7 +22,7 @@ class InstanceManagerClient {
     this.framework.onNet('ng_core:instance-left', this.onInstanceLeft.bind(this));
     this.framework.onNet('ng_core:instance-invite', this.onInstanceInvite.bind(this));
 
-    console.log('[Instance Manager] Client initialized');
+    this.framework.log.debug('[Instance Manager] Client initialized');
   }
 
   /**
@@ -40,7 +40,7 @@ class InstanceManagerClient {
       });
     }
 
-    console.log(`[Instance Manager] Joined instance: ${instanceId} (${instanceType})`);
+    this.framework.log.debug(`[Instance Manager] Joined instance: ${instanceId} (${instanceType})`);
   }
 
   /**
@@ -60,7 +60,7 @@ class InstanceManagerClient {
         });
       }
 
-      console.log(`[Instance Manager] Left instance: ${instanceId}`);
+      this.framework.log.debug(`[Instance Manager] Left instance: ${instanceId}`);
     }
   }
 
@@ -96,7 +96,7 @@ class InstanceManagerClient {
       });
     }
 
-    console.log(`[Instance Manager] Received invite to instance: ${instanceId}`);
+    this.framework.log.debug(`[Instance Manager] Received invite to instance: ${instanceId}`);
   }
 
   /**

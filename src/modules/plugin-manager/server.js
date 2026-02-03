@@ -667,6 +667,23 @@ class PluginManager {
   }
 
   /**
+   * Cleanup plugin manager — unload all plugins
+   */
+  async destroy() {
+    for (const pluginName of [...this.plugins.keys()]) {
+      try {
+        await this.unload(pluginName);
+      } catch (error) {
+        this.framework.log.error(`Failed to unload plugin "${pluginName}" during destroy: ${error.message}`);
+      }
+    }
+    this.plugins.clear();
+    this.pluginStates.clear();
+    this.externalPlugins.clear();
+    this.framework.log.info('Plugin Manager destroyed');
+  }
+
+  /**
    * Display plugin banner with name and version
    * @param {string} resourceName - Resource name
    * @param {Object} metadata - Plugin metadata from ng-plugin.json

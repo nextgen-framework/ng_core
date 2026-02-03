@@ -9,7 +9,7 @@ let hasReceivedSpawnedStage = false;
 // Failsafe timeout - force shutdown after 60 seconds to prevent connection timeout
 setTimeout(() => {
   if (!hasShutdown) {
-    console.log('[Loading Screen] Failsafe timeout reached, forcing shutdown');
+    global.Framework.log.debug('[Loading Screen] Failsafe timeout reached, forcing shutdown');
     hasShutdown = true;
     ShutdownLoadingScreen();
     ShutdownLoadingScreenNui();
@@ -18,7 +18,7 @@ setTimeout(() => {
 
 // Listen for loading progress updates from server (network event)
 global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, message) => {
-  console.log(`[Loading Screen] Received stage update: ${stage} - ${message}`);
+  global.Framework.log.debug(`[Loading Screen] Received stage update: ${stage} - ${message}`);
 
   // Send to NUI
   SendNUIMessage({
@@ -31,11 +31,11 @@ global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, mess
   // Check if we received the spawned stage
   if (stage === 'spawned' && !hasReceivedSpawnedStage) {
     hasReceivedSpawnedStage = true;
-    console.log('[Loading Screen] Received spawned stage, shutting down...');
+    global.Framework.log.debug('[Loading Screen] Received spawned stage, shutting down...');
 
     if (!hasShutdown) {
       hasShutdown = true;
-      console.log('[Loading Screen] Shutting down loading screen');
+      global.Framework.log.debug('[Loading Screen] Shutting down loading screen');
       ShutdownLoadingScreen();
     ShutdownLoadingScreenNui();
     }
@@ -46,10 +46,10 @@ global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, mess
 on('playerSpawned', () => {
   if (!hasShutdown) {
     hasShutdown = true;
-    console.log('[Loading Screen] Player spawned (fallback), shutting down loading screen');
+    global.Framework.log.debug('[Loading Screen] Player spawned (fallback), shutting down loading screen');
     ShutdownLoadingScreen();
     ShutdownLoadingScreenNui();
   }
 });
 
-console.log('[Connection Manager] Client initialized - listening for loading events');
+global.Framework.log.debug('[Connection Manager] Client initialized - listening for loading events');

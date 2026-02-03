@@ -162,9 +162,8 @@ class Queue {
       // Server has space, allow connection through stages
       this.connecting.add(source);
 
-      // Log direct connection to console
       const displayType = typeConfig ? typeConfig.displayName : (queueType || 'Default');
-      console.log(`[NextGen] [Queue] Player connecting: ${identifiers.license} | Queue: ${displayType} | Priority: ${priority} | Direct connection (${playerCount + 1}/${this.config.maxPlayers})`);
+      this.framework.log.info(`[Queue] Player connecting: ${identifiers.license} | Queue: ${displayType} | Priority: ${priority} | Direct (${playerCount + 1}/${this.config.maxPlayers})`);
 
       // Start connection process through connection-manager
       if (this.connectionManager) {
@@ -193,10 +192,9 @@ class Queue {
     const queueTypeStr = queueType ? `type: ${queueType}, ` : '';
     this.framework.log.info(`Player ${identifiers.license} added to queue (${queueTypeStr}priority: ${priority}, position: ${position}/${this.queue.length})`);
 
-    // Also log to console for visibility
     const typeConfigForLog = queueType ? this.typeConfigs.get(queueType) : null;
     const displayType = typeConfigForLog ? typeConfigForLog.displayName : (queueType || 'Default');
-    console.log(`[NextGen] [Queue] Player connecting: ${identifiers.license} | Queue: ${displayType} | Priority: ${priority} | Position: ${position}/${this.queue.length}`);
+    this.framework.log.info(`[Queue] Queued: ${identifiers.license} | Queue: ${displayType} | Priority: ${priority} | Position: ${position}/${this.queue.length}`);
   }
 
   /**
@@ -287,12 +285,9 @@ class Queue {
       this.removeFromQueue(entry.source);
       this.connecting.add(entry.source);
 
-      // Log to console
       const typeConfig = entry.queueType ? this.typeConfigs.get(entry.queueType) : null;
       const displayType = typeConfig ? typeConfig.displayName : (entry.queueType || 'Default');
-      console.log(`[NextGen] [Queue] Player allowed from queue: ${entry.identifiers.license} | Queue: ${displayType} | Priority: ${entry.priority} | Waited: ${Math.floor((Date.now() - entry.joinedAt) / 1000)}s`);
-
-      this.framework.log.info(`Player ${entry.identifiers.license} allowed to connect from queue`);
+      this.framework.log.info(`[Queue] Allowed: ${entry.identifiers.license} | Queue: ${displayType} | Priority: ${entry.priority} | Waited: ${Math.floor((Date.now() - entry.joinedAt) / 1000)}s`);
 
       // Notify plugins (ng_queue) to cleanup animation state
       this.framework.fivem.emit('ng:queue:playerExitQueue', entry.source);

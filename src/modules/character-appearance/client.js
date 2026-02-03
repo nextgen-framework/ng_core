@@ -18,7 +18,7 @@ class CharacterAppearanceClient {
    */
   init() {
     this.registerEvents();
-    console.log('[Character Appearance] Client initialized');
+    this.framework.log.debug('[Character Appearance] Client initialized');
 
     // Request appearance from server now that we're ready to receive it
     this.requestAppearance();
@@ -28,7 +28,7 @@ class CharacterAppearanceClient {
    * Request appearance from server
    */
   requestAppearance() {
-    console.log('[Character Appearance] Requesting appearance from server...');
+    this.framework.log.debug('[Character Appearance] Requesting appearance from server...');
     this.framework.fivem.emitNet('ng_core:request-appearance');
   }
 
@@ -38,12 +38,12 @@ class CharacterAppearanceClient {
   registerEvents() {
     // Apply appearance when received from server
     this.framework.onNet('ng_core:apply-appearance', async (appearance) => {
-      console.log('[Character Appearance] Received appearance from server');
+      this.framework.log.debug('[Character Appearance] Received appearance from server');
       this.currentAppearance = appearance;
 
       // Apply appearance immediately
       await this.onApplyAppearance(appearance);
-      console.log('[Character Appearance] Appearance applied');
+      this.framework.log.debug('[Character Appearance] Appearance applied');
     });
   }
 
@@ -52,14 +52,14 @@ class CharacterAppearanceClient {
    */
   async onApplyAppearance(appearance) {
     if (this.isApplying) {
-      console.log('[Character Appearance] Already applying appearance, skipping...');
+      this.framework.log.debug('[Character Appearance] Already applying appearance, skipping...');
       return;
     }
 
     this.isApplying = true;
     this.currentAppearance = appearance;
 
-    console.log(`[Character Appearance] Applying appearance with model: ${appearance.model}`);
+    this.framework.log.debug(`[Character Appearance] Applying appearance with model: ${appearance.model}`);
 
     try {
       await this.applyModel(appearance.model);
@@ -67,10 +67,10 @@ class CharacterAppearanceClient {
       // Apply customizations (components, props, headBlend, etc.)
       this.applyCustomization(appearance);
 
-      console.log('[Character Appearance] Appearance applied successfully');
+      this.framework.log.debug('[Character Appearance] Appearance applied successfully');
 
       // Signal to server that client is ready (appearance applied)
-      console.log('[Character Appearance] Signaling server that client is ready...');
+      this.framework.log.debug('[Character Appearance] Signaling server that client is ready...');
       this.framework.fivem.emitNet('ng_core:client-ready');
 
     } catch (error) {
@@ -115,7 +115,7 @@ class CharacterAppearanceClient {
     const playerPed = PlayerPedId();
     SetEntityAlpha(playerPed, 255, false);
 
-    console.log(`[Character Appearance] Model ${modelName} applied`);
+    this.framework.log.debug(`[Character Appearance] Model ${modelName} applied`);
   }
 
   /**
@@ -198,7 +198,7 @@ class CharacterAppearanceClient {
   saveAppearance() {
     if (this.currentAppearance) {
       this.framework.fivem.emitNet('ng_core:save-appearance', this.currentAppearance);
-      console.log('[Character Appearance] Appearance saved');
+      this.framework.log.debug('[Character Appearance] Appearance saved');
     }
   }
 

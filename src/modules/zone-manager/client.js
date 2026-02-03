@@ -36,7 +36,7 @@ class ZoneManagerClientModule {
    * Initialize the zone manager client module
    */
   async init() {
-    console.log('[ZoneManager] Client module initializing...');
+    this.framework.log.debug('[ZoneManager] Client module initializing...');
 
     // Start update loop
     this.startUpdateLoop();
@@ -47,7 +47,7 @@ class ZoneManagerClientModule {
     // Register commands
     this.registerCommands();
 
-    console.log('[ZoneManager] Client module initialized');
+    this.framework.log.debug('[ZoneManager] Client module initialized');
   }
 
   /**
@@ -316,7 +316,7 @@ class ZoneManagerClientModule {
     this.zones.set(zone.id, zone);
     this.spatial.insert(zone);
 
-    console.log(`[ZoneManager] Client zone created: ${zone.name} (${type})`);
+    this.framework.log.debug(`[ZoneManager] Client zone created: ${zone.name} (${type})`);
 
     return zone;
   }
@@ -352,7 +352,7 @@ class ZoneManagerClientModule {
     this.visualizedZones.delete(id);
     zone.destroy();
 
-    console.log(`[ZoneManager] Client zone removed: ${zone.name}`);
+    this.framework.log.debug(`[ZoneManager] Client zone removed: ${zone.name}`);
 
     return true;
   }
@@ -435,7 +435,7 @@ class ZoneManagerClientModule {
     this.spatial.clear();
     this.visualizedZones.clear();
 
-    console.log('[ZoneManager] All client zones cleared');
+    this.framework.log.debug('[ZoneManager] All client zones cleared');
   }
 
   /**
@@ -458,7 +458,7 @@ class ZoneManagerClientModule {
   async destroy() {
     this.stopUpdateLoop();
     this.clearAll();
-    console.log('[ZoneManager] Client module destroyed');
+    this.framework.log.debug('[ZoneManager] Client module destroyed');
   }
 }
 

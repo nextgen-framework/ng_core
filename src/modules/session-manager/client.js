@@ -34,7 +34,7 @@ class SessionManagerClient {
     this.framework.onNet('ng_core:session-spectating', this.onSpectating.bind(this));
     this.framework.onNet('ng_core:session-spectating-ended', this.onSpectatingEnded.bind(this));
 
-    console.log('[Session Manager] Client initialized');
+    this.framework.log.debug('[Session Manager] Client initialized');
   }
 
   /**
@@ -42,7 +42,7 @@ class SessionManagerClient {
    */
   onSessionCreated(sessionId, type) {
     this.currentSession = { id: sessionId, type, isHost: true, state: 'waiting' };
-    console.log(`[Session Manager] Created session: ${sessionId} (${type})`);
+    this.framework.log.debug(`[Session Manager] Created session: ${sessionId} (${type})`);
 
     // Notify UI
     if (this.framework.getModule('notifications')) {
@@ -59,7 +59,7 @@ class SessionManagerClient {
    */
   onSessionJoined(sessionId, type) {
     this.currentSession = { id: sessionId, type, isHost: false, state: 'waiting' };
-    console.log(`[Session Manager] Joined session: ${sessionId} (${type})`);
+    this.framework.log.debug(`[Session Manager] Joined session: ${sessionId} (${type})`);
 
     if (this.framework.getModule('notifications')) {
       this.framework.getModule('notifications').show({
@@ -75,7 +75,7 @@ class SessionManagerClient {
    */
   onSessionLeft(sessionId, reason) {
     if (this.currentSession && this.currentSession.id === sessionId) {
-      console.log(`[Session Manager] Left session: ${sessionId} (${reason})`);
+      this.framework.log.debug(`[Session Manager] Left session: ${sessionId} (${reason})`);
       this.currentSession = null;
 
       if (this.framework.getModule('notifications')) {
@@ -94,7 +94,7 @@ class SessionManagerClient {
   onSessionStarted(sessionId) {
     if (this.currentSession && this.currentSession.id === sessionId) {
       this.currentSession.state = 'active';
-      console.log(`[Session Manager] Session started: ${sessionId}`);
+      this.framework.log.debug(`[Session Manager] Session started: ${sessionId}`);
 
       if (this.framework.getModule('notifications')) {
         this.framework.getModule('notifications').show({
@@ -112,7 +112,7 @@ class SessionManagerClient {
   onSessionEnded(sessionId, results) {
     if (this.currentSession && this.currentSession.id === sessionId) {
       this.currentSession.state = 'finished';
-      console.log(`[Session Manager] Session ended: ${sessionId}`, results);
+      this.framework.log.debug(`[Session Manager] Session ended: ${sessionId}`, results);
 
       if (this.framework.getModule('notifications')) {
         this.framework.getModule('notifications').show({
@@ -133,14 +133,14 @@ class SessionManagerClient {
    * Handle player joined session
    */
   onPlayerJoined(source) {
-    console.log(`[Session Manager] Player ${source} joined session`);
+    this.framework.log.debug(`[Session Manager] Player ${source} joined session`);
   }
 
   /**
    * Handle player left session
    */
   onPlayerLeft(source, reason) {
-    console.log(`[Session Manager] Player ${source} left session (${reason})`);
+    this.framework.log.debug(`[Session Manager] Player ${source} left session (${reason})`);
   }
 
   /**
@@ -150,7 +150,7 @@ class SessionManagerClient {
     if (this.currentSession) {
       const playerId = PlayerId();
       this.currentSession.isHost = (GetPlayerServerId(playerId) === newHost);
-      console.log(`[Session Manager] Host changed to ${newHost}`);
+      this.framework.log.debug(`[Session Manager] Host changed to ${newHost}`);
     }
   }
 
@@ -159,7 +159,7 @@ class SessionManagerClient {
    */
   onSpectating(sessionId) {
     this.isSpectating = true;
-    console.log(`[Session Manager] Spectating session: ${sessionId}`);
+    this.framework.log.debug(`[Session Manager] Spectating session: ${sessionId}`);
   }
 
   /**
@@ -167,7 +167,7 @@ class SessionManagerClient {
    */
   onSpectatingEnded(sessionId) {
     this.isSpectating = false;
-    console.log(`[Session Manager] Stopped spectating session: ${sessionId}`);
+    this.framework.log.debug(`[Session Manager] Stopped spectating session: ${sessionId}`);
   }
 
   /**

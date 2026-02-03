@@ -445,6 +445,16 @@ class Database {
   }
 
   /**
+   * Cleanup database module
+   */
+  async destroy() {
+    this.collections.clear();
+    this.connected = false;
+    this.backend = null;
+    this.framework.log.info('Database module destroyed');
+  }
+
+  /**
    * Check if database is connected
    * @returns {boolean}
    */

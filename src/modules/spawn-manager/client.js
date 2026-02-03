@@ -26,7 +26,7 @@ class SpawnManagerClient {
             SetEntityVisible(ped, false, false);
         }
 
-        console.log('[Spawn Manager] Client initialized');
+        this.framework.log.debug('[Spawn Manager] Client initialized');
     }
 
     /**
@@ -57,7 +57,7 @@ class SpawnManagerClient {
         const modelHash = typeof modelName === 'number' ? modelName : GetHashKey(modelName);
 
         if (!IsModelInCdimage(modelHash) || !IsModelValid(modelHash)) {
-            console.log(`[Spawn Manager] Invalid model: ${modelName}`);
+            this.framework.log.debug(`[Spawn Manager] Invalid model: ${modelName}`);
             return false;
         }
 
@@ -70,7 +70,7 @@ class SpawnManagerClient {
         }
 
         if (!HasModelLoaded(modelHash)) {
-            console.log(`[Spawn Manager] Failed to load model: ${modelName}`);
+            this.framework.log.debug(`[Spawn Manager] Failed to load model: ${modelName}`);
             return false;
         }
 
@@ -126,7 +126,7 @@ class SpawnManagerClient {
         ShutdownLoadingScreen();
         ShutdownLoadingScreenNui();
 
-        console.log(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
+        this.framework.log.debug(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
 
         // Trigger FiveM playerSpawned event
         emit('playerSpawned');
