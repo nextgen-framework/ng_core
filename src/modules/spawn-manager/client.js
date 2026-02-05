@@ -88,6 +88,15 @@ class SpawnManagerClient {
         const startTime = Date.now();
         console.log(`[Spawn Manager] START spawn at ${coords.x}, ${coords.y}, ${coords.z}`);
 
+        // Resurrect player if dead
+        if (IsEntityDead(playerPed)) {
+            console.log(`[Spawn Manager] Player is dead, resurrecting...`);
+            NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, coords.heading || 0, true, false);
+            playerPed = PlayerPedId(); // Get new ped after resurrection
+            ClearPedTasksImmediately(playerPed);
+            RemoveAllPedWeapons(playerPed, true);
+        }
+
         // Request collision at spawn point
         RequestCollisionAtCoord(coords.x, coords.y, coords.z);
 
