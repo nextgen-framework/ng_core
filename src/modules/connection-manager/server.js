@@ -125,11 +125,14 @@ class ConnectionManager {
   }
 
   /**
-   * Update stage progress for a player
+   * Update loading stage for a player via loading-screen module
    */
-  updateStageProgress(source, progress, stage, message) {
+  updateLoadingStage(source, stage, message) {
     try {
-      this.framework.fivem.emitNet('ng:loading:updateProgress', source, progress, stage, message);
+      const loadingScreen = this.framework.getModule('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.setStage(source, stage, message);
+      }
     } catch (error) {
       // Silently fail if player disconnected
     }
@@ -168,7 +171,7 @@ class ConnectionManager {
       });
 
       // Update loading screen (FiveM loading is 0-20%, framework stages are 20-100%)
-      this.updateStageProgress(source, 20, 'loading', 'Loading player data...');
+      this.updateLoadingStage(source, 'loading', 'Loading player data...');
 
       // Check if player still connected
       if (!this.isPlayerConnected(source)) {
@@ -278,7 +281,7 @@ class ConnectionManager {
 
       // Update loading screen - waiting for client (20-50%)
       currentSource = this.getCurrentSource(license) || currentSource;
-      this.updateStageProgress(currentSource, 50, 'waiting_client', 'Initializing client...');
+      this.updateLoadingStage(currentSource, 'waiting_client', 'Initializing client...');
 
       // Wait for client to signal it's ready (appearance applied)
       const clientReadyResult = await this.waitForClientReady(currentSource, identifiers);
@@ -298,7 +301,7 @@ class ConnectionManager {
       this.framework.log.debug(`[Connection] Client ready for ${license} (source ${currentSource})`);
 
       // Update loading screen - checking permissions (50-70%)
-      this.updateStageProgress(currentSource, 70, 'checking', 'Checking permissions...');
+      this.updateLoadingStage(currentSource, 'checking', 'Checking permissions...');
 
       // Execute PLAYER_CHECK_PERMISSIONS hook
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CHECKING);
@@ -328,7 +331,7 @@ class ConnectionManager {
       }
 
       // Update loading screen - preparing spawn (70-90%)
-      this.updateStageProgress(currentSource, 90, 'ready', 'Preparing spawn...');
+      this.updateLoadingStage(currentSource, 'ready', 'Preparing spawn...');
 
       // Execute PLAYER_READY_TO_SPAWN hook
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.READY);
@@ -359,7 +362,7 @@ class ConnectionManager {
 
       // Mark as spawned
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.SPAWNED);
-      this.updateStageProgress(currentSource, 100, 'spawned', 'Welcome!');
+      this.updateLoadingStage(currentSource, 'spawned', 'Welcome!');
 
       const stageInfo = this.playerStages.get(license);
       const totalTime = Date.now() - stageInfo.startedAt;
