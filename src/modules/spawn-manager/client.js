@@ -122,8 +122,12 @@ class SpawnManagerClient {
 
         this.hasSpawned = true;
 
-        // Signal spawn complete - ng_loading handles all loading screen shutdown
+        // Kill all loading screens (ng_core must work without ng_loading)
+        ShutdownLoadingScreen();
+        ShutdownLoadingScreenNui();
         DoScreenFadeIn(0);
+
+        // Signal spawn complete (cross-resource event for optional listeners like ng_loading)
         this.framework.fivem.triggerEvent('playerSpawned');
         console.log('[Spawn Manager] playerSpawned event triggered');
         console.log(`[Spawn Manager] DONE (+${Date.now() - startTime}ms)`);
