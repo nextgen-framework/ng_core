@@ -49,7 +49,7 @@ class CharacterManager {
     this.framework.fivem.on('playerDropped', () => {
       const character = this.activeCharacters.get(source);
       if (character) {
-        this.framework.fivem.emit('ng_core|before:character/drop', source, character);
+        this.framework.fivem.emit('ng_core|character/drop:before', source, character);
       }
       this.activeCharacters.delete(source);
     });
@@ -239,6 +239,9 @@ class CharacterManager {
 
       // Trigger hook for other modules to load character data
       await this.framework.events.pipe('character:selected', { source, character });
+
+      // Emit FiveM event for cross-resource listeners (ng_rp_core, etc.)
+      this.framework.fivem.emit('ng_core|character/selected', source, character);
 
       return { success: true, character };
     } catch (error) {

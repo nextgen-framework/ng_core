@@ -146,9 +146,25 @@ class SpawnManagerClient {
         }
         DoScreenFadeIn(0);
 
-        // 9. Signal spawn complete - playerSpawned handler will release protection
+        // 9. Apply health and armor if provided in options
+        if (options.health !== undefined) {
+            const health = Math.max(100, Math.min(200, options.health));
+            SetEntityHealth(playerPed, health);
+            console.log(`[Spawn Manager] Health set to ${health}`);
+        }
+        if (options.armor !== undefined) {
+            const armor = Math.max(0, Math.min(100, options.armor));
+            SetPedArmour(playerPed, armor);
+            console.log(`[Spawn Manager] Armor set to ${armor}`);
+        }
+
+        // 10. Signal spawn complete
+        // Local event for other client modules
         this.framework.fivem.triggerEvent('playerSpawned');
-        console.log('[Spawn Manager] playerSpawned event triggered');
+        // Net event for server hooks (ng_core|spawn/at:after)
+        this.framework.fivem.emitNet('ng_core|spawn/complete');
+
+        console.log('[Spawn Manager] playerSpawned + spawn/complete triggered');
         console.log(`[Spawn Manager] DONE (+${Date.now() - startTime}ms)`);
 
         this.framework.log.debug(`[Spawn Manager] Spawned at (${coords.x}, ${coords.y}, ${coords.z})`);
