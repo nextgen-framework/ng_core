@@ -122,10 +122,9 @@ class SpawnManagerClient {
 
         this.hasSpawned = true;
 
-        // Kill loading screens and signal spawn complete
-        console.log(`[Spawn Manager] Killing loading screens (+${Date.now() - startTime}ms)`);
+        // Kill FiveM native loading screen (not the custom NUI - that's ng_loading's job)
+        console.log(`[Spawn Manager] Shutting down native loading screen (+${Date.now() - startTime}ms)`);
         ShutdownLoadingScreen();
-        ShutdownLoadingScreenNui();
         DoScreenFadeIn(0);
 
         // Signal spawn complete (cross-resource)
