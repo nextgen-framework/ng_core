@@ -122,9 +122,11 @@ class SpawnManagerClient {
 
         this.hasSpawned = true;
 
-        // Kill all loading screens (ng_core must work without ng_loading)
-        ShutdownLoadingScreen();
-        ShutdownLoadingScreenNui();
+        // Kill all loading screens via dedicated module
+        const loadingScreen = this.framework.getModule('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.shutdown();
+        }
         DoScreenFadeIn(0);
 
         // Signal spawn complete (cross-resource event for optional listeners like ng_loading)
