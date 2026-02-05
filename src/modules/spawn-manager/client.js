@@ -122,12 +122,8 @@ class SpawnManagerClient {
 
         this.hasSpawned = true;
 
-        // Kill FiveM native loading screen (not the custom NUI - that's ng_loading's job)
-        console.log(`[Spawn Manager] Shutting down native loading screen (+${Date.now() - startTime}ms)`);
-        ShutdownLoadingScreen();
+        // Signal spawn complete - ng_loading handles all loading screen shutdown
         DoScreenFadeIn(0);
-
-        // Signal spawn complete (cross-resource)
         this.framework.fivem.triggerEvent('playerSpawned');
         console.log('[Spawn Manager] playerSpawned event triggered');
         console.log(`[Spawn Manager] DONE (+${Date.now() - startTime}ms)`);
