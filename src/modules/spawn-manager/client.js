@@ -88,24 +88,33 @@ class SpawnManagerClient {
         const startTime = Date.now();
         console.log(`[Spawn Manager] START spawn at ${coords.x}, ${coords.y}, ${coords.z}`);
 
-        // Resurrect player if dead
+        // 1. PROTECT FIRST - before any position change
+        SetPlayerInvincible(PlayerId(), true);
+        FreezeEntityPosition(playerPed, true);
+        SetEntityVisible(playerPed, false, false);
+        SetPlayerControl(PlayerId(), false, 0);
+
+        // 2. Resurrect if dead (after protection)
         if (IsEntityDead(playerPed)) {
             console.log(`[Spawn Manager] Player is dead, resurrecting...`);
             NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, coords.heading || 0, true, false);
-            playerPed = PlayerPedId(); // Get new ped after resurrection
+            playerPed = PlayerPedId();
             ClearPedTasksImmediately(playerPed);
             RemoveAllPedWeapons(playerPed, true);
+            // Re-apply protection after resurrection
+            SetPlayerInvincible(PlayerId(), true);
+            FreezeEntityPosition(playerPed, true);
         }
 
-        // Request collision at spawn point
+        // 3. Request collision at spawn point
         RequestCollisionAtCoord(coords.x, coords.y, coords.z);
 
-        // Set player position
+        // 4. Set position (player is protected)
         SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false);
         SetEntityHeading(playerPed, coords.heading || 0);
         console.log(`[Spawn Manager] Position set (+${Date.now() - startTime}ms)`);
 
-        // Wait for collision to load (max 2s)
+        // 5. Wait for collision to load (max 2s)
         let attempts = 0;
         while (!HasCollisionLoadedAroundEntity(playerPed) && attempts < 20) {
             await this.delay(100);
@@ -113,32 +122,31 @@ class SpawnManagerClient {
         }
         console.log(`[Spawn Manager] Collision loaded after ${attempts} attempts (+${Date.now() - startTime}ms)`);
 
-        // Ground Z correction
+        // 6. Ground Z correction
         const [found, groundZ] = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z + 1.0, false);
         if (found && Math.abs(groundZ - coords.z) < 3.0) {
             SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, groundZ + 1.0, false, false, false);
         }
         console.log(`[Spawn Manager] Ground Z done (+${Date.now() - startTime}ms)`);
 
-        // Protect ped during transition
-        SetPlayerInvincible(PlayerId(), true);
-        FreezeEntityPosition(playerPed, true);
+        // 7. Make visible (still frozen and invincible)
         SetEntityVisible(playerPed, true, false);
         NetworkSetEntityInvisibleToNetwork(playerPed, false);
+        SetPlayerControl(PlayerId(), true, 0);
 
         // Reset camera
         RenderScriptCams(false, false, 0, true, true);
 
         this.hasSpawned = true;
 
-        // Kill all loading screens via dedicated module
+        // 8. Kill all loading screens via dedicated module
         const loadingScreen = this.framework.getModule('loading-screen');
         if (loadingScreen) {
             loadingScreen.shutdown();
         }
         DoScreenFadeIn(0);
 
-        // Signal spawn complete (cross-resource event for optional listeners like ng_loading)
+        // 9. Signal spawn complete - playerSpawned handler will release protection
         this.framework.fivem.triggerEvent('playerSpawned');
         console.log('[Spawn Manager] playerSpawned event triggered');
         console.log(`[Spawn Manager] DONE (+${Date.now() - startTime}ms)`);
