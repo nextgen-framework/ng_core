@@ -246,6 +246,9 @@ class VehicleManager {
             // Emit event
             this.framework.events.emit('vehicle:stored', vehicleId, garage);
 
+            // Emit FiveM event for cross-resource listeners
+            this.framework.fivem.emit('ng_core|vehicle/stored', vehicleId, garage);
+
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
@@ -277,6 +280,9 @@ class VehicleManager {
 
             // Emit event — client should spawn the actual entity
             this.framework.fivem.emitNet('ng_core|vehicle/spawned', source, vehicle.model, position, vehicle);
+
+            // Emit FiveM event for cross-resource listeners (server-side)
+            this.framework.fivem.emit('ng_core|vehicle/spawned', source, vehicleId, vehicle);
 
             return { success: true, vehicle };
         } catch (error) {

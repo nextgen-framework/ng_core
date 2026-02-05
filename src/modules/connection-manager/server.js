@@ -161,6 +161,9 @@ class ConnectionManager {
       const license = identifiers.license;
       const playerName = this.getPlayerName(source);
 
+      // Emit FiveM event for cross-resource listeners
+      this.framework.fivem.emit('ng_core|connection/joining', source, identifiers, playerName);
+
       // Set initial stage using license
       this.setPlayerStageByLicense(license, this.framework.constants.PlayerStage.CONNECTING, {
         source,
@@ -377,6 +380,9 @@ class ConnectionManager {
         { source: currentSource, identifiers, playerData: this.playerData.get(license) }
       );
 
+      // Emit FiveM event for cross-resource listeners
+      this.framework.fivem.emit('ng_core|connection/joined', currentSource, identifiers);
+
       return true;
     } catch (error) {
       this.framework.log.error(`[Connection] Post-connection process failed for ${license}: ${error.message}`);
@@ -536,6 +542,9 @@ class ConnectionManager {
     const license = player?.identifiers?.license;
 
     if (license) {
+      // Emit FiveM event for cross-resource listeners
+      this.framework.fivem.emit('ng_core|connection/dropped', source, license, reason);
+
       const stage = this.getPlayerStageByLicense(license);
       if (stage) {
         this.framework.log.info(`Player ${license} (source ${source}) dropped during stage: ${stage} (${reason})`);

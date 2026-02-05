@@ -251,6 +251,9 @@ class BalancesManager {
                 identifier, oldBalance, newBalance, amount, operation: 'add', reason
             });
 
+            // Emit FiveM event for cross-resource listeners
+            this.framework.fivem.emit('ng_core|balance/changed', identifier, oldBalance, newBalance, amount, 'add', reason);
+
             return { success: true, balance: newBalance };
         } catch (error) {
             this.framework.log.error(`Failed to add balance: ${error.message}`);
@@ -296,6 +299,9 @@ class BalancesManager {
                 identifier, oldBalance, newBalance, amount, operation: 'remove', reason
             });
 
+            // Emit FiveM event for cross-resource listeners
+            this.framework.fivem.emit('ng_core|balance/changed', identifier, oldBalance, newBalance, amount, 'remove', reason);
+
             return { success: true, balance: newBalance };
         } catch (error) {
             this.framework.log.error(`Failed to remove balance: ${error.message}`);
@@ -335,6 +341,9 @@ class BalancesManager {
             await this.framework.events.pipe('balances:changed', {
                 identifier, oldBalance, newBalance: amount, amount: amount - oldBalance, operation: 'set', reason
             });
+
+            // Emit FiveM event for cross-resource listeners
+            this.framework.fivem.emit('ng_core|balance/changed', identifier, oldBalance, amount, amount - oldBalance, 'set', reason);
 
             return { success: true, balance: amount };
         } catch (error) {
@@ -393,6 +402,9 @@ class BalancesManager {
                 from: fromIdentifier, to: toIdentifier, amount, reason,
                 fromBalance: fromNewBalance, toBalance: toNewBalance
             });
+
+            // Emit FiveM event for cross-resource listeners
+            this.framework.fivem.emit('ng_core|balance/transfer', fromIdentifier, toIdentifier, amount, fromNewBalance, toNewBalance, reason);
 
             return { success: true, fromBalance: fromNewBalance, toBalance: toNewBalance };
         } catch (error) {

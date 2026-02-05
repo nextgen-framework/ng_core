@@ -316,6 +316,9 @@ class ContainerManager {
 
     this.framework.log.debug(`Added item to container ${containerId}: ${itemId} x${quantity}`);
 
+    // Emit FiveM event for cross-resource listeners
+    this.framework.fivem.emit('ng_core|container/item-added', containerId, itemId, quantity, slot, metadata);
+
     return { success: true, slot };
   }
 
@@ -368,6 +371,9 @@ class ContainerManager {
     await this.saveContainer(containerId);
 
     this.framework.log.debug(`Removed item from container ${containerId}: ${item.itemId} x${quantity}`);
+
+    // Emit FiveM event for cross-resource listeners
+    this.framework.fivem.emit('ng_core|container/item-removed', containerId, item.itemId, quantity, slot);
 
     return { success: true, itemId: item.itemId, quantity, metadata: item.metadata };
   }

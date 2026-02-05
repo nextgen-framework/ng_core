@@ -181,6 +181,9 @@ class CharacterManager {
       // Trigger hook for other modules
       await this.framework.events.pipe('character:created', { source, characterId, characterData });
 
+      // Emit FiveM event for cross-resource listeners
+      this.framework.fivem.emit('ng_core|character/created', source, characterId, data);
+
       const character = {
         id: characterId,
         identifier,
@@ -280,6 +283,9 @@ class CharacterManager {
 
       // Trigger hook before deletion (other modules can clean up their data)
       await this.framework.events.pipe('character:beforeDelete', { source, characterId });
+
+      // Emit FiveM event for cross-resource listeners
+      this.framework.fivem.emit('ng_core|character/deleted:before', source, characterId);
 
       // Delete character
       await this.db.execute('DELETE FROM characters WHERE id = ?', [characterId]);
