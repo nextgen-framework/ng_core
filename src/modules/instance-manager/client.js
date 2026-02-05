@@ -10,7 +10,7 @@ class InstanceManagerClient {
     this.pendingInvites = [];
 
     // Pre-registered at script load time (cerulean)
-    this.netEvents = ['ng_core:instance-joined', 'ng_core:instance-left', 'ng_core:instance-invite'];
+    this.netEvents = ['ng_core|instance/joined', 'ng_core|instance/left', 'ng_core|instance/invite'];
   }
 
   /**
@@ -18,9 +18,9 @@ class InstanceManagerClient {
    */
   init() {
     // Listen for instance events
-    this.framework.onNet('ng_core:instance-joined', this.onInstanceJoined.bind(this));
-    this.framework.onNet('ng_core:instance-left', this.onInstanceLeft.bind(this));
-    this.framework.onNet('ng_core:instance-invite', this.onInstanceInvite.bind(this));
+    this.framework.onNet('ng_core|instance/joined', this.onInstanceJoined.bind(this));
+    this.framework.onNet('ng_core|instance/left', this.onInstanceLeft.bind(this));
+    this.framework.onNet('ng_core|instance/invite', this.onInstanceInvite.bind(this));
 
     this.framework.log.debug('[Instance Manager] Client initialized');
   }
@@ -103,7 +103,7 @@ class InstanceManagerClient {
    * Accept instance invitation
    */
   acceptInvite(instanceId) {
-    this.framework.fivem.emitNet('ng_core:instance-accept-invite', instanceId);
+    this.framework.fivem.emitNet('ng_core|instance/accept-invite', instanceId);
 
     // Remove from pending
     this.pendingInvites = this.pendingInvites.filter(i => i.instanceId !== instanceId);
@@ -113,7 +113,7 @@ class InstanceManagerClient {
    * Decline instance invitation
    */
   declineInvite(instanceId) {
-    this.framework.fivem.emitNet('ng_core:instance-decline-invite', instanceId);
+    this.framework.fivem.emitNet('ng_core|instance/decline-invite', instanceId);
 
     // Remove from pending
     this.pendingInvites = this.pendingInvites.filter(i => i.instanceId !== instanceId);
@@ -123,7 +123,7 @@ class InstanceManagerClient {
    * Request to join instance
    */
   requestJoin(instanceId) {
-    this.framework.fivem.emitNet('ng_core:instance-request-join', instanceId);
+    this.framework.fivem.emitNet('ng_core|instance/request-join', instanceId);
   }
 
   /**
@@ -131,7 +131,7 @@ class InstanceManagerClient {
    */
   requestLeave() {
     if (this.currentInstance) {
-      this.framework.fivem.emitNet('ng_core:instance-request-leave');
+      this.framework.fivem.emitNet('ng_core|instance/request-leave');
     }
   }
 

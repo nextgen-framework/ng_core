@@ -79,7 +79,7 @@ class SyncManager {
     this.saveTimer = setInterval(() => this.saveState(), 300000);
 
     // Handle client requesting sync (client fires this when ready)
-    this.framework.onNet('ng_core:request-sync', () => {
+    this.framework.onNet('ng_core|sync/request', () => {
       this.syncToPlayer(source);
     });
 
@@ -235,7 +235,7 @@ class SyncManager {
       this.state.weather.transition = weatherType;
 
       // Sync transition to all clients
-      this.framework.fivem.emitNet('ng_core:weather-transition', -1, weatherType, this.state.weather.transitionDuration);
+      this.framework.fivem.emitNet('ng_core|sync/weather-transition', -1, weatherType, this.state.weather.transitionDuration);
 
       // Update current weather after transition completes
       this._weatherTransitionTimeout = setTimeout(() => {
@@ -247,7 +247,7 @@ class SyncManager {
       this.framework.log.debug(`Weather transitioning to ${weatherType}`);
     } else {
       this.state.weather.current = weatherType;
-      this.framework.fivem.emitNet('ng_core:weather-set', -1, weatherType);
+      this.framework.fivem.emitNet('ng_core|sync/weather-set', -1, weatherType);
       this.framework.log.info(`Weather set to ${weatherType}`);
     }
   }
@@ -287,7 +287,7 @@ class SyncManager {
    */
   setBlackout(enabled) {
     this.state.blackout = enabled;
-    this.framework.fivem.emitNet('ng_core:blackout-set', -1, enabled);
+    this.framework.fivem.emitNet('ng_core|sync/blackout-set', -1, enabled);
     this.framework.log.info(`Blackout ${enabled ? 'enabled' : 'disabled'}`);
   }
 
@@ -309,7 +309,7 @@ class SyncManager {
     const val = Number(density);
     if (Number.isNaN(val)) return;
     this.state.trafficDensity = Math.max(0, Math.min(1, val));
-    this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core|sync/traffic-density-set', -1, this.state.trafficDensity);
     this.framework.log.info(`Traffic density set to ${this.state.trafficDensity}`);
   }
 
@@ -320,7 +320,7 @@ class SyncManager {
     const val = Number(density);
     if (Number.isNaN(val)) return;
     this.state.pedestrianDensity = Math.max(0, Math.min(1, val));
-    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core|sync/pedestrian-density-set', -1, this.state.pedestrianDensity);
     this.framework.log.info(`Pedestrian density set to ${this.state.pedestrianDensity}`);
   }
 
@@ -357,34 +357,34 @@ class SyncManager {
    */
   syncToAll() {
     this.syncTimeToAll(false);
-    this.framework.fivem.emitNet('ng_core:weather-set', -1, this.state.weather.current);
-    this.framework.fivem.emitNet('ng_core:blackout-set', -1, this.state.blackout);
-    this.framework.fivem.emitNet('ng_core:traffic-density-set', -1, this.state.trafficDensity);
-    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', -1, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core|sync/weather-set', -1, this.state.weather.current);
+    this.framework.fivem.emitNet('ng_core|sync/blackout-set', -1, this.state.blackout);
+    this.framework.fivem.emitNet('ng_core|sync/traffic-density-set', -1, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core|sync/pedestrian-density-set', -1, this.state.pedestrianDensity);
   }
 
   /**
    * Sync current state to specific player
    */
   syncToPlayer(source) {
-    this.framework.fivem.emitNet('ng_core:time-set', source,
+    this.framework.fivem.emitNet('ng_core|sync/time-set', source,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,
       this.state.time.frozen,
       false // No transition
     );
-    this.framework.fivem.emitNet('ng_core:weather-set', source, this.state.weather.current);
-    this.framework.fivem.emitNet('ng_core:blackout-set', source, this.state.blackout);
-    this.framework.fivem.emitNet('ng_core:traffic-density-set', source, this.state.trafficDensity);
-    this.framework.fivem.emitNet('ng_core:pedestrian-density-set', source, this.state.pedestrianDensity);
+    this.framework.fivem.emitNet('ng_core|sync/weather-set', source, this.state.weather.current);
+    this.framework.fivem.emitNet('ng_core|sync/blackout-set', source, this.state.blackout);
+    this.framework.fivem.emitNet('ng_core|sync/traffic-density-set', source, this.state.trafficDensity);
+    this.framework.fivem.emitNet('ng_core|sync/pedestrian-density-set', source, this.state.pedestrianDensity);
   }
 
   /**
    * Sync time to all clients
    */
   syncTimeToAll(transition) {
-    this.framework.fivem.emitNet('ng_core:time-set', -1,
+    this.framework.fivem.emitNet('ng_core|sync/time-set', -1,
       this.state.time.hour,
       this.state.time.minute,
       this.state.time.second,

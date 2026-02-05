@@ -112,7 +112,7 @@ class AdminManager {
     // Noclip command
     chatCommands.register('noclip', (source, args) => {
       if (!this.isAdmin(source)) return;
-      this.framework.fivem.emitNet('ng_core:admin-noclip', source);
+      this.framework.fivem.emitNet('ng_core|admin/noclip', source);
     });
   }
 

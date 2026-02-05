@@ -47,19 +47,19 @@ class SessionManager {
     });
 
     // Handle client-initiated actions
-    this.framework.onNet('ng_core:session-create', (type, options) => {
+    this.framework.onNet('ng_core|session/create', (type, options) => {
       this.createSession(type, source, options);
     });
 
-    this.framework.onNet('ng_core:session-join', (sessionId) => {
+    this.framework.onNet('ng_core|session/join', (sessionId) => {
       this.addPlayerToSession(source, sessionId);
     });
 
-    this.framework.onNet('ng_core:session-leave', () => {
+    this.framework.onNet('ng_core|session/leave', () => {
       this.removePlayerFromSession(source);
     });
 
-    this.framework.onNet('ng_core:session-start', () => {
+    this.framework.onNet('ng_core|session/start', () => {
       const session = this.getPlayerSession(source);
       if (session && session.host === source) {
         this.startSession(session.id);
@@ -212,7 +212,7 @@ class SessionManager {
     this.framework.log.info(`Created session: ${sessionId} (type: ${type}, host: ${host})`);
 
     // Emit event
-    this.framework.fivem.emitNet('ng_core:session-created', host, sessionId, type);
+    this.framework.fivem.emitNet('ng_core|session/created', host, sessionId, type);
 
     return { success: true, sessionId, instanceId };
   }
@@ -302,8 +302,8 @@ class SessionManager {
     this.framework.log.debug(`Player ${source} joined session ${sessionId}`);
 
     // Emit event
-    this.framework.fivem.emitNet('ng_core:session-joined', source, sessionId, session.type);
-    this.broadcastToSession(sessionId, 'ng_core:session-player-joined', source);
+    this.framework.fivem.emitNet('ng_core|session/joined', source, sessionId, session.type);
+    this.broadcastToSession(sessionId, 'ng_core|session/player-joined', source);
 
     return { success: true };
   }
@@ -338,9 +338,9 @@ class SessionManager {
 
     // Emit event (skip direct emitNet if player already disconnected)
     if (!silent) {
-      this.framework.fivem.emitNet('ng_core:session-left', source, sessionId, reason);
+      this.framework.fivem.emitNet('ng_core|session/left', source, sessionId, reason);
     }
-    this.broadcastToSession(sessionId, 'ng_core:session-player-left', source, reason);
+    this.broadcastToSession(sessionId, 'ng_core|session/player-left', source, reason);
 
     // Check if session should be ended (skip if already being deleted)
     if (session.players.size === 0 && !session._deleting) {
@@ -349,7 +349,7 @@ class SessionManager {
       // Transfer host to another player
       const newHost = Array.from(session.players)[0];
       session.host = newHost;
-      this.broadcastToSession(sessionId, 'ng_core:session-host-changed', newHost);
+      this.broadcastToSession(sessionId, 'ng_core|session/host-changed', newHost);
     }
 
     return { success: true };
@@ -378,7 +378,7 @@ class SessionManager {
 
     this.framework.log.debug(`Player ${source} is now spectating session ${sessionId}`);
 
-    this.framework.fivem.emitNet('ng_core:session-spectating', source, sessionId);
+    this.framework.fivem.emitNet('ng_core|session/spectating', source, sessionId);
 
     return { success: true };
   }
@@ -399,7 +399,7 @@ class SessionManager {
         }
 
         if (!silent) {
-          this.framework.fivem.emitNet('ng_core:session-spectating-ended', source, sessionId);
+          this.framework.fivem.emitNet('ng_core|session/spectating-ended', source, sessionId);
         }
         return { success: true };
       }
@@ -431,7 +431,7 @@ class SessionManager {
 
     this.framework.log.info(`Session ${sessionId} started`);
 
-    this.broadcastToSession(sessionId, 'ng_core:session-started', sessionId);
+    this.broadcastToSession(sessionId, 'ng_core|session/started', sessionId);
 
     return { success: true };
   }
@@ -451,7 +451,7 @@ class SessionManager {
 
     this.framework.log.info(`Session ${sessionId} ended`);
 
-    this.broadcastToSession(sessionId, 'ng_core:session-ended', sessionId, results);
+    this.broadcastToSession(sessionId, 'ng_core|session/ended', sessionId, results);
 
     // Auto-delete after a delay (store ref for cleanup)
     session._endTimer = setTimeout(() => {

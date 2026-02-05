@@ -29,7 +29,7 @@ class SpawnManager {
      * @param {Object} [options] - { fadeIn, fadeDuration, model }
      */
     spawnPlayerAt(source, coords, options = {}) {
-        this.framework.fivem.emitNet('ng_core:spawn-at', source, coords, {
+        this.framework.fivem.emitNet('ng_core|spawn/at', source, coords, {
             fadeIn: options.fadeIn ?? this.config.spawnFadeIn,
             fadeDuration: options.fadeDuration ?? this.config.spawnFadeDuration,
             model: options.model

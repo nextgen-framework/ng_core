@@ -26,7 +26,7 @@ class BlipManager {
      */
     async init() {
         // Sync blips to players on connect
-        this.framework.fivem.onNet('ng_core:blips:requestAll', () => {
+        this.framework.fivem.onNet('ng_core|blips/request-all', () => {
             const src = global.source;
             this._syncToPlayer(src);
         });
@@ -201,19 +201,19 @@ class BlipManager {
      */
     _syncToPlayer(source) {
         const blips = this.getAllBlips();
-        this.framework.fivem.emitNet('ng_core:blips:syncAll', source, blips);
+        this.framework.fivem.emitNet('ng_core|blips/sync-all', source, blips);
     }
 
     _broadcastBlipAdd(blip) {
-        this.framework.fivem.emitNet('ng_core:blips:add', -1, blip);
+        this.framework.fivem.emitNet('ng_core|blips/add', -1, blip);
     }
 
     _broadcastBlipRemove(id) {
-        this.framework.fivem.emitNet('ng_core:blips:remove', -1, id);
+        this.framework.fivem.emitNet('ng_core|blips/remove', -1, id);
     }
 
     _broadcastBlipUpdate(blip) {
-        this.framework.fivem.emitNet('ng_core:blips:update', -1, blip);
+        this.framework.fivem.emitNet('ng_core|blips/update', -1, blip);
     }
 
     // ================================

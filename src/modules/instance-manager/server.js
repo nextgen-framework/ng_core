@@ -46,11 +46,11 @@ class InstanceManager {
     });
 
     // Handle client-initiated actions (with server-side validation)
-    this.framework.onNet('ng_core:instance-request-leave', () => {
+    this.framework.onNet('ng_core|instance/request-leave', () => {
       this.removePlayerFromInstance(source);
     });
 
-    this.framework.onNet('ng_core:instance-accept-invite', (instanceId) => {
+    this.framework.onNet('ng_core|instance/accept-invite', (instanceId) => {
       // Validate invitation exists server-side
       const invites = this._pendingInvites.get(source);
       if (!invites || !invites.has(instanceId)) {
@@ -175,7 +175,7 @@ class InstanceManager {
     this.framework.log.debug(`Player ${source} joined instance ${instanceId}`);
 
     // Emit event
-    this.framework.fivem.emitNet('ng_core:instance-joined', source, instanceId, instance.type);
+    this.framework.fivem.emitNet('ng_core|instance/joined', source, instanceId, instance.type);
 
     return { success: true, routingBucket: instance.routingBucket };
   }
@@ -208,7 +208,7 @@ class InstanceManager {
     // Return to public world (skip if player already disconnected)
     if (!silent) {
       SetPlayerRoutingBucket(source, this.config.defaultBucket);
-      this.framework.fivem.emitNet('ng_core:instance-left', source, instanceId);
+      this.framework.fivem.emitNet('ng_core|instance/left', source, instanceId);
     }
 
     this.framework.log.debug(`Player ${source} left instance ${instanceId}`);
@@ -337,7 +337,7 @@ class InstanceManager {
     this._pendingInvites.get(source).add(instanceId);
 
     // Send invitation to client
-    this.framework.fivem.emitNet('ng_core:instance-invite', source, instanceId, instance.type, instance.metadata);
+    this.framework.fivem.emitNet('ng_core|instance/invite', source, instanceId, instance.type, instance.metadata);
 
     this.framework.log.debug(`Player ${source} invited to instance ${instanceId}`);
 

@@ -8,6 +8,22 @@
  *   Hooks:  prefix:namespace/action  → 'before:player/save', 'after:player/save'
  */
 
+// Display banner
+const _side = typeof IsDuplicityVersion === 'function' && IsDuplicityVersion() ? 'Server' : 'Client';
+console.log('');
+console.log(' /$$   /$$                       /$$      /$$$$$$                       ');
+console.log('| $$$ | $$                      | $$     /$$__  $$                      ');
+console.log('| $$$$| $$  /$$$$$$  /$$   /$$ /$$$$$$  | $$  \\__/  /$$$$$$  /$$$$$$$ ');
+console.log('| $$ $$ $$ /$$__  $$|  $$ /$$/|_  $$_/  | $$ /$$$$ /$$__  $$| $$__  $$');
+console.log('| $$  $$$$| $$$$$$$$ \\  $$$$/   | $$    | $$|_  $$| $$$$$$$$| $$  \\ $$');
+console.log('| $$\\  $$$| $$_____/  >$$  $$   | $$ /$$| $$  \\ $$| $$_____/| $$  | $$');
+console.log('| $$ \\  $$|  $$$$$$$ /$$/\\  $$  |  $$$$/|  $$$$$$/|  $$$$$$$| $$  | $$');
+console.log('|__/  \\__/ \\_______/|__/  \\__/   \\___/   \\______/  \\_______/|__/  |__/');
+console.log('');
+console.log(`                           v1.0.0 (${_side})`);
+console.log('                     Ultra-Generic & Dynamic');
+console.log('');
+
 // Capture FiveM natives (safe references, no scoping issues)
 const _on = on;
 const _onNet = onNet;
@@ -112,12 +128,7 @@ const LOG_LEVELS = {
     trace: 0, debug: 1, info: 2, success: 2, warn: 3, error: 4, fatal: 5
 };
 
-const LOG_COLORS = {
-    trace: '\x1b[90m', debug: '\x1b[36m', info: '\x1b[34m', success: '\x1b[32m',
-    warn: '\x1b[33m', error: '\x1b[31m', fatal: '\x1b[35m',
-    reset: '\x1b[0m', dim: '\x1b[90m'
-};
-
+const _resourceName = GetCurrentResourceName();
 let _logLevel = 'info';
 try { _logLevel = GetConvar('ngcore_log_level', 'info'); } catch (e) {}
 
@@ -155,7 +166,10 @@ class ModuleRegistry {
             },
             emitNet(...args) { _emitNet(...args); },
             on(...args) { _on(...args); },
-            emit(...args) { _emit(...args); }
+            emit(...args) { _emit(...args); },
+            // Cross-resource local events
+            addEventHandler(...args) { AddEventHandler(...args); },
+            triggerEvent(...args) { TriggerEvent(...args); }
         };
 
         // Shortcuts: framework.onNet() → framework.fivem.onNet()
@@ -174,19 +188,17 @@ class ModuleRegistry {
             const minLevel = LOG_LEVELS[_logLevel] ?? LOG_LEVELS.info;
             if (numLevel < minLevel) return;
 
-            const resource = GetCurrentResourceName();
             const time = new Date().toISOString().substring(11, 19);
-            const color = LOG_COLORS[level] || LOG_COLORS.info;
-            const tag = level.toUpperCase().padEnd(7);
+            const tag = level.toUpperCase();
 
-            let output = `${LOG_COLORS.dim}[${time}]${LOG_COLORS.reset} ${LOG_COLORS.dim}[${resource}]${LOG_COLORS.reset} ${color}${tag}${LOG_COLORS.reset} ${message}`;
+            let output = `[${time}][${tag}] ${message}`;
             if (metadata && typeof metadata === 'object' && Object.keys(metadata).length > 0) {
                 output += ` ${JSON.stringify(metadata)}`;
             }
             console.log(output);
 
             if (_logHooks.length > 0) {
-                const entry = { message, level, resource, timestamp: Date.now(), metadata };
+                const entry = { message, level, resource: _resourceName, timestamp: Date.now(), metadata };
                 for (const hook of _logHooks) {
                     try { hook(entry); } catch (e) {}
                 }

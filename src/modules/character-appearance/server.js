@@ -23,13 +23,13 @@ class CharacterAppearanceModule {
    */
   registerEvents() {
     // When player spawns, send their appearance
-    this.framework.onNet('ng_core:request-appearance', () => {
+    this.framework.onNet('ng_core|appearance/request', () => {
       const playerSource = source;
       this.sendAppearance(playerSource);
     });
 
     // Save appearance from client
-    this.framework.onNet('ng_core:save-appearance', (appearance) => {
+    this.framework.onNet('ng_core|appearance/save', (appearance) => {
       const playerSource = source;
       this.saveAppearance(playerSource, appearance);
     });
@@ -158,7 +158,7 @@ class CharacterAppearanceModule {
 
     const appearance = this.playerAppearances.get(source) || this.getDefaultAppearance();
 
-    this.framework.fivem.emitNet('ng_core:apply-appearance', source, appearance);
+    this.framework.fivem.emitNet('ng_core|appearance/apply', source, appearance);
     this.framework.log.info(`Appearance sent to player ${source}`);
   }
 

@@ -16,21 +16,21 @@ class SyncManagerClient {
      */
     init() {
         // Listen for time updates
-        this.framework.onNet('ng_core:time-set', this.onTimeSet.bind(this));
+        this.framework.onNet('ng_core|sync/time-set', this.onTimeSet.bind(this));
 
         // Listen for weather updates
-        this.framework.onNet('ng_core:weather-set', this.onWeatherSet.bind(this));
-        this.framework.onNet('ng_core:weather-transition', this.onWeatherTransition.bind(this));
+        this.framework.onNet('ng_core|sync/weather-set', this.onWeatherSet.bind(this));
+        this.framework.onNet('ng_core|sync/weather-transition', this.onWeatherTransition.bind(this));
 
         // Listen for blackout updates
-        this.framework.onNet('ng_core:blackout-set', this.onBlackoutSet.bind(this));
+        this.framework.onNet('ng_core|sync/blackout-set', this.onBlackoutSet.bind(this));
 
         // Listen for density updates
-        this.framework.onNet('ng_core:traffic-density-set', this.onTrafficDensitySet.bind(this));
-        this.framework.onNet('ng_core:pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
+        this.framework.onNet('ng_core|sync/traffic-density-set', this.onTrafficDensitySet.bind(this));
+        this.framework.onNet('ng_core|sync/pedestrian-density-set', this.onPedestrianDensitySet.bind(this));
 
         // Request full sync from server (client is ready)
-        this.framework.emitNet('ng_core:request-sync');
+        this.framework.emitNet('ng_core|sync/request');
 
         this.framework.log.debug('[SyncManager] Client initialized');
     }

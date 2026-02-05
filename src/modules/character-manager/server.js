@@ -45,8 +45,12 @@ class CharacterManager {
       rpc.register('character:deleteCharacter', this.deleteCharacter.bind(this));
     }
 
-    // Handle player drop
+    // Handle player drop — emit FiveM event before clearing cache so other resources can save state
     this.framework.fivem.on('playerDropped', () => {
+      const character = this.activeCharacters.get(source);
+      if (character) {
+        this.framework.fivem.emit('ng_core|before:character/drop', source, character);
+      }
       this.activeCharacters.delete(source);
     });
 

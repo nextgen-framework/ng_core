@@ -1,55 +1,33 @@
 /**
- * Connection Manager - Client Side
- * Handles loading screen updates and shutdown
+ * NextGen Framework - Connection Manager (Client)
+ * Client-side connection handling.
+ * Note: The client-ready signal is sent by character-appearance module
+ * after appearance is applied (ng_core|connection/client-ready).
  */
 
-let hasShutdown = false;
-let hasReceivedSpawnedStage = false;
-
-// Failsafe timeout - force shutdown after 60 seconds to prevent connection timeout
-setTimeout(() => {
-  if (!hasShutdown) {
-    global.Framework.log.debug('[Loading Screen] Failsafe timeout reached, forcing shutdown');
-    hasShutdown = true;
-    ShutdownLoadingScreen();
-    ShutdownLoadingScreenNui();
-  }
-}, 60000); // 60 seconds
-
-// Listen for loading progress updates from server (network event)
-global.Framework.fivem.onNet('ng:loading:updateProgress', (progress, stage, message) => {
-  global.Framework.log.debug(`[Loading Screen] Received stage update: ${stage} - ${message}`);
-
-  // Send to NUI
-  SendNUIMessage({
-    type: 'ng:loading:stage',
-    progress: progress,
-    stage: stage || 'loading',
-    message: message
-  });
-
-  // Check if we received the spawned stage
-  if (stage === 'spawned' && !hasReceivedSpawnedStage) {
-    hasReceivedSpawnedStage = true;
-    global.Framework.log.debug('[Loading Screen] Received spawned stage, shutting down...');
-
-    if (!hasShutdown) {
-      hasShutdown = true;
-      global.Framework.log.debug('[Loading Screen] Shutting down loading screen');
-      ShutdownLoadingScreen();
-    ShutdownLoadingScreenNui();
+class ConnectionManagerClient {
+    constructor(framework) {
+        this.framework = framework;
     }
-  }
-});
 
-// Fallback: Listen for playerSpawned event
-on('playerSpawned', () => {
-  if (!hasShutdown) {
-    hasShutdown = true;
-    global.Framework.log.debug('[Loading Screen] Player spawned (fallback), shutting down loading screen');
-    ShutdownLoadingScreen();
-    ShutdownLoadingScreenNui();
-  }
-});
+    /**
+     * Initialize connection manager client
+     */
+    init() {
+        this.framework.log.debug('[Connection Manager] Client initialized');
+    }
 
-global.Framework.log.debug('[Connection Manager] Client initialized - listening for loading events');
+    /**
+     * Cleanup
+     */
+    async destroy() {
+        this.framework.log.info('Connection Manager client destroyed');
+    }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ConnectionManagerClient;
+}
+
+// Self-register
+global.Framework.register('connection-manager', new ConnectionManagerClient(global.Framework), 5);

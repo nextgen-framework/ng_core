@@ -29,7 +29,7 @@ class ConnectionManager {
     });
 
     // Handle client ready signals
-    this.framework.fivem.onNet('ng_core:client-ready', () => {
+    this.framework.fivem.onNet('ng_core|connection/client-ready', () => {
       const clientSource = source;
 
       // Get player identifiers to match against waiting resolvers
@@ -366,7 +366,7 @@ class ConnectionManager {
       this.framework.log.info(`[Connection] Player ${license} completed all stages in ${totalTime}ms`);
 
       // Trigger spawn on client (ng_freemode will handle the actual spawn)
-      this.framework.fivem.emitNet('ng_core:readyToSpawn', currentSource);
+      this.framework.fivem.emitNet('ng_core|connection/ready-to-spawn', currentSource);
 
       // Execute PLAYER_SPAWNED hook
       await this.framework.events.pipe(

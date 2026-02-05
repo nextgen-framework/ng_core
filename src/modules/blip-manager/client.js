@@ -19,22 +19,22 @@ class BlipRenderer {
      */
     async init() {
         // Request all blips from server
-        this.framework.fivem.emitNet('ng_core:blips:requestAll');
+        this.framework.fivem.emitNet('ng_core|blips/request-all');
 
         // Listen for server sync events
-        this.framework.fivem.onNet('ng_core:blips:syncAll', (blips) => {
+        this.framework.fivem.onNet('ng_core|blips/sync-all', (blips) => {
             this._handleSyncAll(blips);
         });
 
-        this.framework.fivem.onNet('ng_core:blips:add', (blip) => {
+        this.framework.fivem.onNet('ng_core|blips/add', (blip) => {
             this._createNativeBlip(blip);
         });
 
-        this.framework.fivem.onNet('ng_core:blips:remove', (id) => {
+        this.framework.fivem.onNet('ng_core|blips/remove', (id) => {
             this._removeNativeBlip(id);
         });
 
-        this.framework.fivem.onNet('ng_core:blips:update', (blip) => {
+        this.framework.fivem.onNet('ng_core|blips/update', (blip) => {
             this._updateNativeBlip(blip);
         });
 

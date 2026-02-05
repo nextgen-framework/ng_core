@@ -10,7 +10,7 @@ class CharacterAppearanceClient {
     this.isApplying = false;
 
     // Pre-registered at script load time (cerulean)
-    this.netEvents = ['ng_core:apply-appearance'];
+    this.netEvents = ['ng_core|appearance/apply'];
   }
 
   /**
@@ -29,7 +29,7 @@ class CharacterAppearanceClient {
    */
   requestAppearance() {
     this.framework.log.debug('[Character Appearance] Requesting appearance from server...');
-    this.framework.fivem.emitNet('ng_core:request-appearance');
+    this.framework.fivem.emitNet('ng_core|appearance/request');
   }
 
   /**
@@ -37,7 +37,7 @@ class CharacterAppearanceClient {
    */
   registerEvents() {
     // Apply appearance when received from server
-    this.framework.onNet('ng_core:apply-appearance', async (appearance) => {
+    this.framework.onNet('ng_core|appearance/apply', async (appearance) => {
       this.framework.log.debug('[Character Appearance] Received appearance from server');
       this.currentAppearance = appearance;
 
@@ -70,8 +70,9 @@ class CharacterAppearanceClient {
       this.framework.log.debug('[Character Appearance] Appearance applied successfully');
 
       // Signal to server that client is ready (appearance applied)
+      // This event is what connection-manager waits for before proceeding
       this.framework.log.debug('[Character Appearance] Signaling server that client is ready...');
-      this.framework.fivem.emitNet('ng_core:client-ready');
+      this.framework.fivem.emitNet('ng_core|connection/client-ready');
 
     } catch (error) {
       this.framework.log.error(`[Character Appearance] Error applying appearance: ${error.message}`);
@@ -197,7 +198,7 @@ class CharacterAppearanceClient {
    */
   saveAppearance() {
     if (this.currentAppearance) {
-      this.framework.fivem.emitNet('ng_core:save-appearance', this.currentAppearance);
+      this.framework.fivem.emitNet('ng_core|appearance/save', this.currentAppearance);
       this.framework.log.debug('[Character Appearance] Appearance saved');
     }
   }

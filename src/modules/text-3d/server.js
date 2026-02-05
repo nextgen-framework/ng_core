@@ -23,7 +23,7 @@ class Text3DManager {
      */
     async init() {
         // Sync points to players on connect
-        this.framework.fivem.onNet('ng_core:text3d:requestAll', () => {
+        this.framework.fivem.onNet('ng_core|text3d/request-all', () => {
             const src = global.source;
             this._syncToPlayer(src);
         });
@@ -130,7 +130,7 @@ class Text3DManager {
      */
     toggleGroup(groupName, visible) {
         this.groups.set(groupName, visible);
-        this.framework.fivem.emitNet('ng_core:text3d:groupToggle', -1, groupName, visible);
+        this.framework.fivem.emitNet('ng_core|text3d/group-toggle', -1, groupName, visible);
     }
 
     /**
@@ -176,19 +176,19 @@ class Text3DManager {
     _syncToPlayer(source) {
         const points = this.getAllPoints();
         const groupStates = Object.fromEntries(this.groups);
-        this.framework.fivem.emitNet('ng_core:text3d:syncAll', source, points, groupStates);
+        this.framework.fivem.emitNet('ng_core|text3d/sync-all', source, points, groupStates);
     }
 
     _broadcastPointAdd(point) {
-        this.framework.fivem.emitNet('ng_core:text3d:add', -1, point);
+        this.framework.fivem.emitNet('ng_core|text3d/add', -1, point);
     }
 
     _broadcastPointRemove(id) {
-        this.framework.fivem.emitNet('ng_core:text3d:remove', -1, id);
+        this.framework.fivem.emitNet('ng_core|text3d/remove', -1, id);
     }
 
     _broadcastPointUpdate(point) {
-        this.framework.fivem.emitNet('ng_core:text3d:update', -1, point);
+        this.framework.fivem.emitNet('ng_core|text3d/update', -1, point);
     }
 
     // ================================

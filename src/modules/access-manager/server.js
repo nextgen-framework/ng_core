@@ -290,7 +290,7 @@ class AccessManager {
         });
 
         if (result.success) {
-            this.framework.fivem.emitNet('ng_core:door-state-changed', -1, doorId, newLocked);
+            this.framework.fivem.emitNet('ng_core|access/door-state-changed', -1, doorId, newLocked);
             this.framework.log.debug(`Door ${doorId} ${newLocked ? 'locked' : 'unlocked'} by ${identifier}`);
         }
 

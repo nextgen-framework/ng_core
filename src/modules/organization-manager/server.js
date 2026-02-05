@@ -462,7 +462,7 @@ class OrganizationManager {
 
         // Emit event
         this.framework.events.emit('organization:duty-toggled', source, orgId, onDuty);
-        this.framework.fivem.emitNet('ng_core:duty-toggled', source, orgId, onDuty);
+        this.framework.fivem.emitNet('ng_core|organization/duty-toggled', source, orgId, onDuty);
 
         this.framework.log.debug(`Player ${source} duty ${onDuty ? 'on' : 'off'} for org ${orgId}`);
 

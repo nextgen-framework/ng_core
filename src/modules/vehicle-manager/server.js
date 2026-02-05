@@ -276,7 +276,7 @@ class VehicleManager {
             this.framework.log.debug(`Vehicle ${vehicleId} retrieved from ${vehicle.garage}`);
 
             // Emit event — client should spawn the actual entity
-            this.framework.fivem.emitNet('ng_core:vehicle-spawned', source, vehicle.model, position, vehicle);
+            this.framework.fivem.emitNet('ng_core|vehicle/spawned', source, vehicle.model, position, vehicle);
 
             return { success: true, vehicle };
         } catch (error) {

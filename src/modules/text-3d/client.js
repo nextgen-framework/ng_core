@@ -26,26 +26,26 @@ class Text3DRenderer {
      */
     async init() {
         // Request all points from server
-        this.framework.fivem.emitNet('ng_core:text3d:requestAll');
+        this.framework.fivem.emitNet('ng_core|text3d/request-all');
 
         // Server sync events
-        this.framework.fivem.onNet('ng_core:text3d:syncAll', (points, groupStates) => {
+        this.framework.fivem.onNet('ng_core|text3d/sync-all', (points, groupStates) => {
             this._handleSyncAll(points, groupStates);
         });
 
-        this.framework.fivem.onNet('ng_core:text3d:add', (point) => {
+        this.framework.fivem.onNet('ng_core|text3d/add', (point) => {
             this.points.set(point.id, point);
         });
 
-        this.framework.fivem.onNet('ng_core:text3d:remove', (id) => {
+        this.framework.fivem.onNet('ng_core|text3d/remove', (id) => {
             this.points.delete(id);
         });
 
-        this.framework.fivem.onNet('ng_core:text3d:update', (point) => {
+        this.framework.fivem.onNet('ng_core|text3d/update', (point) => {
             this.points.set(point.id, point);
         });
 
-        this.framework.fivem.onNet('ng_core:text3d:groupToggle', (groupName, visible) => {
+        this.framework.fivem.onNet('ng_core|text3d/group-toggle', (groupName, visible) => {
             this.groupState.set(groupName, visible);
         });
 
